@@ -1,0 +1,80 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "strategy-agent"
+version = "0.1.0"
+description = "LangChain deep agent framework for corporate strategy document generation"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+authors = [{name = "Jon-Cody Sokoll"}]
+keywords = ["langchain", "langgraph", "strategy", "agent", "rag", "knowledge-graph", "openai-compatible"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "License :: OSI Approved :: MIT License",
+]
+
+[project.urls]
+Repository = "https://github.com/sokjc/nonfiction-waffle"
+dependencies = [
+    # --- LangChain core ---
+    "langchain>=0.3,<0.4",
+    "langchain-community>=0.3,<0.4",
+    "langchain-openai>=0.3,<0.4",
+    "langgraph>=0.3,<0.4",
+
+    # --- Session persistence ---
+    "langgraph-checkpoint-sqlite>=2.0,<3.0",
+
+    # --- Document ingestion ---
+    "python-docx>=1.1",
+    "pypdf>=5.0",
+    "docx2txt>=0.8",
+    "beautifulsoup4>=4.12",
+    "tiktoken>=0.8",
+
+    # --- Vector store & embeddings ---
+    "chromadb>=0.6",
+    "sentence-transformers>=3.0",
+
+    # --- Knowledge graph ---
+    "networkx>=3.2",
+
+    # --- Configuration & CLI ---
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "python-dotenv>=1.0",
+    "typer[all]>=0.15",
+    "rich>=13.9",
+
+    # --- Utilities ---
+    "tenacity>=9.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=6.0",
+    "ruff>=0.8",
+]
+
+[project.scripts]
+strategy-agent = "strategy_agent.cli:app"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
