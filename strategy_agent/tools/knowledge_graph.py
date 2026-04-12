@@ -2,24 +2,29 @@
 
 from __future__ import annotations
 
+import threading
+
 from langchain_core.tools import tool
 
 from strategy_agent.memory.knowledge_graph import KnowledgeGraphStore
 
+_lock = threading.Lock()
 _store: KnowledgeGraphStore | None = None
 
 
 def _get_store() -> KnowledgeGraphStore:
     global _store
-    if _store is None:
-        _store = KnowledgeGraphStore()
-    return _store
+    with _lock:
+        if _store is None:
+            _store = KnowledgeGraphStore()
+        return _store
 
 
 def set_store(store: KnowledgeGraphStore) -> None:
     """Allow external code to inject a store instance."""
     global _store
-    _store = store
+    with _lock:
+        _store = store
 
 
 @tool
@@ -46,7 +51,7 @@ def query_knowledge_graph(entity: str) -> str:
     # Fall back to partial match
     matches = store.search_entities(entity)
     if matches:
-        lines = [f"- {s} --[{p}]--> {o}" for s, o, p in matches[:15]]
+        lines = [f"- {s} --[{p}]--> {o}" for s, p, o in matches[:15]]
         return f"Partial matches for '{entity}':\n" + "\n".join(lines)
 
     return f"No relationships found for '{entity}' in the knowledge graph."

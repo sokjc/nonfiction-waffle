@@ -45,6 +45,14 @@ app = typer.Typer(
 )
 console = Console()
 
+VALID_DOCUMENT_TYPES = {
+    "strategy_memo",
+    "white_paper",
+    "board_presentation",
+    "competitive_analysis",
+    "market_assessment",
+}
+
 
 def _setup_logging(verbose: bool = False) -> None:
     level = logging.DEBUG if verbose else logging.INFO
@@ -184,6 +192,12 @@ def generate(
     """Generate a strategy document from the ingested corpus."""
     _setup_logging(verbose)
 
+    # Validate document type
+    if document_type not in VALID_DOCUMENT_TYPES:
+        console.print(f"[red]Invalid document type: '{document_type}'")
+        console.print(f"Valid types: {', '.join(sorted(VALID_DOCUMENT_TYPES))}")
+        raise typer.Exit(1)
+
     # Resolve the brief
     if brief_file:
         brief_text = brief_file.read_text(encoding="utf-8")
@@ -232,6 +246,15 @@ def generate(
             )
 
         console.print(table)
+
+        # Warn if any evaluation had a parse failure
+        if any(ev.parse_failed for ev in memory.evaluations):
+            console.print(
+                "[yellow]Warning: One or more evaluation passes failed to parse "
+                "the LLM's JSON output.  The document was accepted but may benefit "
+                "from manual review."
+            )
+
         console.print()
 
     # Write output
@@ -365,12 +388,12 @@ def chat(
     config = sm.get_config(thread_id)
     agent = build_chat_agent(sm, settings)
 
-    # ── Corpus / KG stats ─────────────────────────────────────────────────
-    from strategy_agent.memory.knowledge_graph import KnowledgeGraphStore
-    from strategy_agent.memory.vector_store import CorpusStore
+    # Reuse the stores already created by build_chat_agent (avoid double init)
+    from strategy_agent.tools.corpus_search import _get_store as _get_corpus
+    from strategy_agent.tools.knowledge_graph import _get_store as _get_kg
 
-    corpus_count = CorpusStore(settings).count
-    kg_count = KnowledgeGraphStore(settings).num_entities
+    corpus_count = _get_corpus().count
+    kg_count = _get_kg().num_entities
 
     console.print(
         Panel(
@@ -412,26 +435,52 @@ def chat(
                     marker = " [bold green]<-- current[/bold green]" if s["thread_id"] == thread_id else ""
                     console.print(f"  {s['thread_id']}  {s['title']}{marker}")
                 continue
+            if stripped.lower() == "/export":
+                try:
+                    state = agent.get_state(config)
+                    messages = state.values.get("messages", [])
+                    if not messages:
+                        console.print("[yellow]No messages to export.")
+                        continue
+                    export_path = settings.output_dir / f"chat_{thread_id}.md"
+                    export_path.parent.mkdir(parents=True, exist_ok=True)
+                    lines: list[str] = []
+                    for m in messages:
+                        role = getattr(m, "type", "unknown").title()
+                        lines.append(f"### {role}\n\n{m.content}\n")
+                    export_path.write_text("\n---\n\n".join(lines), encoding="utf-8")
+                    console.print(f"[green]Exported {len(messages)} messages to {export_path}")
+                except Exception as e:
+                    console.print(f"[red]Export failed: {e}")
+                continue
+
+            # Reject unknown slash commands
+            if stripped.startswith("/"):
+                console.print(f"[yellow]Unknown command: {stripped}. Type /help for available commands.")
+                continue
 
             # Send to agent
             console.print()
             sm.touch_session(thread_id)
 
-            with console.status("[bold green]Thinking..."):
-                result = agent.invoke(
-                    {"messages": [("human", stripped)]},
-                    config=config,
-                )
+            try:
+                with console.status("[bold green]Thinking..."):
+                    result = agent.invoke(
+                        {"messages": [("human", stripped)]},
+                        config=config,
+                    )
 
-            # Extract and display the AI response
-            ai_message = result["messages"][-1]
-            console.print(
-                Panel(
-                    ai_message.content,
-                    title="[bold green]Strategy Agent[/bold green]",
-                    border_style="green",
+                # Extract and display the AI response
+                ai_message = result["messages"][-1]
+                console.print(
+                    Panel(
+                        ai_message.content,
+                        title="[bold green]Strategy Agent[/bold green]",
+                        border_style="green",
+                    )
                 )
-            )
+            except Exception as e:
+                console.print(Panel(f"[red]{e}", title="Error", border_style="red"))
     finally:
         sm.close()
         console.print(f"\n[dim]Session saved.  Resume with: strategy-agent chat --session {thread_id}[/dim]")

@@ -30,20 +30,24 @@ class SessionManager:
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(str(self._db_path), check_same_thread=False)
 
-        # Set up the LangGraph checkpoint tables
-        self._checkpointer = SqliteSaver(self._conn)
-        self._checkpointer.setup()
+        try:
+            # Set up the LangGraph checkpoint tables
+            self._checkpointer = SqliteSaver(self._conn)
+            self._checkpointer.setup()
 
-        # Set up our own sessions metadata table
-        self._conn.execute("""
-            CREATE TABLE IF NOT EXISTS sessions (
-                thread_id   TEXT PRIMARY KEY,
-                title       TEXT NOT NULL,
-                created_at  TEXT NOT NULL,
-                updated_at  TEXT NOT NULL
-            )
-        """)
-        self._conn.commit()
+            # Set up our own sessions metadata table
+            self._conn.execute("""
+                CREATE TABLE IF NOT EXISTS sessions (
+                    thread_id   TEXT PRIMARY KEY,
+                    title       TEXT NOT NULL,
+                    created_at  TEXT NOT NULL,
+                    updated_at  TEXT NOT NULL
+                )
+            """)
+            self._conn.commit()
+        except Exception:
+            self._conn.close()
+            raise
 
     # ── Public API ────────────────────────────────────────────────────────────
 

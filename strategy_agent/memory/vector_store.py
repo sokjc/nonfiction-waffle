@@ -62,7 +62,12 @@ class CorpusStore:
 
     @property
     def count(self) -> int:
-        """Number of chunks currently stored."""
+        """Number of chunks currently stored.
+
+        Note: Chroma's public Python API doesn't expose ``count()`` directly
+        on the LangChain wrapper — ``_collection`` is the underlying
+        ``chromadb.Collection`` object, whose ``count()`` is a stable API.
+        """
         return self._store._collection.count()
 
     def reset(self) -> None:

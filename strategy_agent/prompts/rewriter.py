@@ -43,7 +43,9 @@ Output ONLY the revised document text.
 
 REWRITER_HUMAN = """\
 ## Original Brief
+<user-brief>
 {brief}
+</user-brief>
 
 ## Document Type
 {document_type}

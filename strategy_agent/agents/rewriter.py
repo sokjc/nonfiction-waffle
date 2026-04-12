@@ -13,6 +13,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_openai import ChatOpenAI
 
 from strategy_agent.config import Settings, get_settings
+from strategy_agent.errors import invoke_llm
 from strategy_agent.memory.working_memory import WorkingMemory
 from strategy_agent.models import build_writer_llm
 from strategy_agent.prompts.rewriter import rewriter_prompt
@@ -45,21 +46,25 @@ class RewriterAgent:
             evaluation.summary,
         )
 
-        revised = self._chain.invoke({
-            "brief": memory.brief,
-            "document_type": memory.document_type,
-            "research_synthesis": memory.research_synthesis,
-            "current_iteration": memory.current_iteration,
-            "draft": memory.latest_draft,
-            "overall_score": f"{evaluation.overall_score:.1f}",
-            "storytelling_score": f"{evaluation.storytelling_score:.1f}",
-            "narrative_cohesion_score": f"{evaluation.narrative_cohesion_score:.1f}",
-            "data_integration_score": f"{evaluation.data_integration_score:.1f}",
-            "style_compliance_score": f"{evaluation.style_compliance_score:.1f}",
-            "strengths": "\n".join(f"- {s}" for s in evaluation.strengths),
-            "weaknesses": "\n".join(f"- {w}" for w in evaluation.weaknesses),
-            "rewrite_instructions": evaluation.rewrite_instructions,
-        })
+        revised = invoke_llm(
+            self._chain,
+            {
+                "brief": memory.brief,
+                "document_type": memory.document_type,
+                "research_synthesis": memory.research_synthesis,
+                "current_iteration": memory.current_iteration,
+                "draft": memory.latest_draft,
+                "overall_score": f"{evaluation.overall_score:.1f}",
+                "storytelling_score": f"{evaluation.storytelling_score:.1f}",
+                "narrative_cohesion_score": f"{evaluation.narrative_cohesion_score:.1f}",
+                "data_integration_score": f"{evaluation.data_integration_score:.1f}",
+                "style_compliance_score": f"{evaluation.style_compliance_score:.1f}",
+                "strengths": "\n".join(f"- {s}" for s in evaluation.strengths),
+                "weaknesses": "\n".join(f"- {w}" for w in evaluation.weaknesses),
+                "rewrite_instructions": evaluation.rewrite_instructions,
+            },
+            endpoint_url=self._settings.llm_base_url,
+        )
 
         memory.drafts.append(revised)
         memory.current_iteration += 1

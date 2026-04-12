@@ -15,6 +15,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_openai import ChatOpenAI
 
 from strategy_agent.config import Settings, get_settings
+from strategy_agent.errors import invoke_llm
 from strategy_agent.memory.working_memory import EvaluationResult, WorkingMemory
 from strategy_agent.models import build_eval_llm
 from strategy_agent.prompts.evaluator import evaluator_prompt
@@ -40,10 +41,29 @@ def _parse_evaluation(raw: str) -> EvaluationResult:
     try:
         data = json.loads(cleaned)
     except json.JSONDecodeError:
-        logger.warning("Failed to parse evaluator JSON — returning default scores")
+        logger.warning(
+            "Evaluator returned invalid JSON — accepting draft to avoid wasted rewrite loops.\n"
+            "Raw output (first 500 chars): %s",
+            raw[:500],
+        )
         return EvaluationResult(
             rewrite_instructions=raw,
             weaknesses=["Evaluator output was not valid JSON — manual review needed"],
+            passes_threshold=True,  # Accept rather than loop uselessly
+            parse_failed=True,
+        )
+
+    # Validate that the JSON has the minimum required field
+    if "overall_score" not in data:
+        logger.warning(
+            "Evaluator JSON missing 'overall_score' — accepting draft.\nKeys found: %s",
+            list(data.keys()),
+        )
+        return EvaluationResult(
+            rewrite_instructions=str(data),
+            weaknesses=["Evaluator JSON missing required fields — manual review needed"],
+            passes_threshold=True,
+            parse_failed=True,
         )
 
     return EvaluationResult(
@@ -79,13 +99,17 @@ class EvaluatorAgent:
 
         logger.info("Evaluating draft (iteration %d)", memory.current_iteration)
 
-        raw = self._chain.invoke({
-            "brief": memory.brief,
-            "document_type": memory.document_type,
-            "research_synthesis": memory.research_synthesis,
-            "current_iteration": memory.current_iteration,
-            "draft": draft,
-        })
+        raw = invoke_llm(
+            self._chain,
+            {
+                "brief": memory.brief,
+                "document_type": memory.document_type,
+                "research_synthesis": memory.research_synthesis,
+                "current_iteration": memory.current_iteration,
+                "draft": draft,
+            },
+            endpoint_url=self._settings.eval_base_url_resolved,
+        )
 
         evaluation = _parse_evaluation(raw)
         memory.evaluations.append(evaluation)

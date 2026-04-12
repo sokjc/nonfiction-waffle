@@ -6,9 +6,22 @@ build-backend = "hatchling.build"
 name = "strategy-agent"
 version = "0.1.0"
 description = "LangChain deep agent framework for corporate strategy document generation"
-readme = {text = "", content-type = "text/plain"}
+readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"
+authors = [{name = "Jon-Cody Sokoll"}]
+keywords = ["langchain", "langgraph", "strategy", "agent", "rag", "knowledge-graph", "openai-compatible"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "License :: OSI Approved :: MIT License",
+]
+
+[project.urls]
+Repository = "https://github.com/sokjc/nonfiction-waffle"
 dependencies = [
     # --- LangChain core ---
     "langchain>=0.3,<0.4",

@@ -39,7 +39,9 @@ style guide above.
 
 WRITER_HUMAN = """\
 ## Writing Brief
+<user-brief>
 {brief}
+</user-brief>
 
 ## Document Type
 {document_type}

@@ -17,6 +17,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_openai import ChatOpenAI
 
 from strategy_agent.config import Settings, get_settings
+from strategy_agent.errors import invoke_llm
 from strategy_agent.memory.vector_store import CorpusStore
 from strategy_agent.memory.working_memory import WorkingMemory
 from strategy_agent.models import build_writer_llm
@@ -75,12 +76,16 @@ class ResearchAgent:
 
         # Step 2: Synthesize via LLM
         logger.info("Synthesizing research from %d retrieved passages", len(docs))
-        synthesis = self._chain.invoke({
-            "brief": memory.brief,
-            "document_type": memory.document_type,
-            "additional_instructions": memory.additional_instructions,
-            "retrieved_context": retrieved_text,
-        })
+        synthesis = invoke_llm(
+            self._chain,
+            {
+                "brief": memory.brief,
+                "document_type": memory.document_type,
+                "additional_instructions": memory.additional_instructions,
+                "retrieved_context": retrieved_text,
+            },
+            endpoint_url=self._settings.llm_base_url,
+        )
 
         memory.research_synthesis = synthesis
         logger.info("Research synthesis complete (%d chars)", len(synthesis))

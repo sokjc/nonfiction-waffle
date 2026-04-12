@@ -38,13 +38,17 @@ Be thorough, precise, and honest about what the data does and does not support.
 
 RESEARCH_HUMAN = """\
 ## Writing Brief
+<user-brief>
 {brief}
+</user-brief>
 
 ## Document Type
 {document_type}
 
 ## Additional Instructions
+<user-instructions>
 {additional_instructions}
+</user-instructions>
 
 ## Retrieved Corpus Passages
 {retrieved_context}

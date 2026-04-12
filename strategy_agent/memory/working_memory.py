@@ -25,6 +25,7 @@ class EvaluationResult:
     weaknesses: list[str] = field(default_factory=list)
     rewrite_instructions: str = ""
     passes_threshold: bool = False
+    parse_failed: bool = False  # True when the evaluator's JSON output couldn't be parsed
 
     @property
     def summary(self) -> str:

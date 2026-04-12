@@ -7,11 +7,13 @@ and any other server that exposes the ``/v1/chat/completions`` contract.
 
 from __future__ import annotations
 
-from functools import lru_cache
-
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
 from strategy_agent.config import Settings, get_settings
+
+# Module-level cache for embeddings — avoids re-downloading models on every call.
+# Keyed by (model_name, base_url) so different configs get separate instances.
+_embeddings_cache: dict[tuple[str, str | None], OpenAIEmbeddings] = {}
 
 
 # ---------------------------------------------------------------------------
@@ -46,9 +48,8 @@ def build_eval_llm(settings: Settings | None = None) -> ChatOpenAI:
 # Embedding factory
 # ---------------------------------------------------------------------------
 
-@lru_cache(maxsize=1)
 def build_embeddings(settings: Settings | None = None) -> OpenAIEmbeddings:
-    """Return an embeddings model.
+    """Return an embeddings model, cached by (model, base_url).
 
     When ``EMBEDDING_BASE_URL`` is set the framework uses a remote
     OpenAI-compatible embedding endpoint.  Otherwise it falls back to
@@ -56,15 +57,22 @@ def build_embeddings(settings: Settings | None = None) -> OpenAIEmbeddings:
     HuggingFace integration.
     """
     s = settings or get_settings()
+    cache_key = (s.embedding_model, s.embedding_base_url)
+
+    if cache_key in _embeddings_cache:
+        return _embeddings_cache[cache_key]
 
     if s.embedding_base_url:
-        return OpenAIEmbeddings(
+        emb = OpenAIEmbeddings(
             base_url=s.embedding_base_url,
             api_key=s.embedding_api_key or "not-needed",
             model=s.embedding_model,
         )
+    else:
+        # Local sentence-transformers via the community wrapper
+        from langchain_community.embeddings import HuggingFaceEmbeddings
 
-    # Local sentence-transformers via the community wrapper
-    from langchain_community.embeddings import HuggingFaceEmbeddings
+        emb = HuggingFaceEmbeddings(model_name=s.embedding_model)  # type: ignore[assignment]
 
-    return HuggingFaceEmbeddings(model_name=s.embedding_model)  # type: ignore[return-value]
+    _embeddings_cache[cache_key] = emb
+    return emb

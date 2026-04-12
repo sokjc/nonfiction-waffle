@@ -72,20 +72,28 @@ class KnowledgeGraphStore:
         """Return all known facts about *entity*."""
         return self._graph.get_entity_knowledge(entity)
 
-    def get_all_triples(self) -> list[tuple]:
-        """Return every triple in the graph."""
-        return self._graph.get_triples()
+    def get_all_triples(self) -> list[tuple[str, str, str]]:
+        """Return every triple as ``(subject, predicate, object)``.
+
+        Note: ``NetworkxEntityGraph.get_triples()`` returns
+        ``(subject, object, predicate)`` — we re-order to the conventional
+        ``(s, p, o)`` form so all downstream code uses a consistent layout.
+        """
+        return [(s, p, o) for s, o, p in self._graph.get_triples()]
 
     def get_neighbors(self, entity: str) -> list[str]:
         """Return entities directly connected to *entity*."""
         return list(self._graph.get_neighbors(entity))
 
-    def search_entities(self, query: str) -> list[tuple]:
-        """Case-insensitive partial-match search across all triples."""
+    def search_entities(self, query: str) -> list[tuple[str, str, str]]:
+        """Case-insensitive partial-match search across all triples.
+
+        Returns ``(subject, predicate, object)`` tuples matching the query.
+        """
         q = query.lower()
         return [
-            t for t in self.get_all_triples()
-            if q in str(t[0]).lower() or q in str(t[2]).lower() or q in str(t[1]).lower()
+            (s, p, o) for s, p, o in self.get_all_triples()
+            if q in s.lower() or q in p.lower() or q in o.lower()
         ]
 
     # ── Properties ────────────────────────────────────────────────────────────
@@ -96,8 +104,9 @@ class KnowledgeGraphStore:
 
     @property
     def num_entities(self) -> int:
+        """Count unique entities (subjects and objects) in the graph."""
         entities: set[str] = set()
-        for s, o, p in self.get_all_triples():
-            entities.add(str(s))
-            entities.add(str(o))
+        for s, _p, o in self.get_all_triples():
+            entities.add(s)
+            entities.add(o)
         return len(entities)

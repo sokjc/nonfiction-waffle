@@ -13,6 +13,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_openai import ChatOpenAI
 
 from strategy_agent.config import Settings, get_settings
+from strategy_agent.errors import invoke_llm
 from strategy_agent.memory.working_memory import WorkingMemory
 from strategy_agent.models import build_writer_llm
 from strategy_agent.prompts.writer import writer_prompt
@@ -40,12 +41,16 @@ class WriterAgent:
             memory.current_iteration + 1,
         )
 
-        draft = self._chain.invoke({
-            "brief": memory.brief,
-            "document_type": memory.document_type,
-            "research_synthesis": memory.research_synthesis,
-            "additional_instructions": memory.additional_instructions,
-        })
+        draft = invoke_llm(
+            self._chain,
+            {
+                "brief": memory.brief,
+                "document_type": memory.document_type,
+                "research_synthesis": memory.research_synthesis,
+                "additional_instructions": memory.additional_instructions,
+            },
+            endpoint_url=self._settings.llm_base_url,
+        )
 
         memory.drafts.append(draft)
         memory.current_iteration += 1

@@ -71,7 +71,9 @@ does more damage than a tough score that triggers another revision pass.
 
 EVALUATOR_HUMAN = """\
 ## Original Brief
+<user-brief>
 {brief}
+</user-brief>
 
 ## Document Type
 {document_type}

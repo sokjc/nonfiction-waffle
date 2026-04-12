@@ -7,25 +7,31 @@ static query derived from the brief.
 
 from __future__ import annotations
 
+import threading
+
 from langchain_core.tools import tool
 
 from strategy_agent.memory.vector_store import CorpusStore
 
 # Module-level store instance, lazily initialised on first call.
+# Protected by _lock for thread safety.
+_lock = threading.Lock()
 _store: CorpusStore | None = None
 
 
 def _get_store() -> CorpusStore:
     global _store
-    if _store is None:
-        _store = CorpusStore()
-    return _store
+    with _lock:
+        if _store is None:
+            _store = CorpusStore()
+        return _store
 
 
 def set_store(store: CorpusStore) -> None:
     """Allow external code (e.g. the orchestrator) to inject a store."""
     global _store
-    _store = store
+    with _lock:
+        _store = store
 
 
 @tool
