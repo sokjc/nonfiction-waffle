@@ -16,6 +16,9 @@ dependencies = [
     "langchain-openai>=0.3,<0.4",
     "langgraph>=0.3,<0.4",
 
+    # --- Session persistence ---
+    "langgraph-checkpoint-sqlite>=2.0,<3.0",
+
     # --- Document ingestion ---
     "python-docx>=1.1",
     "pypdf>=5.0",
@@ -26,6 +29,9 @@ dependencies = [
     # --- Vector store & embeddings ---
     "chromadb>=0.6",
     "sentence-transformers>=3.0",
+
+    # --- Knowledge graph ---
+    "networkx>=3.2",
 
     # --- Configuration & CLI ---
     "pydantic>=2.9",

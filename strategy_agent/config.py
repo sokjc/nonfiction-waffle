@@ -48,6 +48,12 @@ class Settings(BaseSettings):
     corpus_dir: Path = Field(Path("./corpus"), alias="CORPUS_DIR")
     output_dir: Path = Field(Path("./output"), alias="OUTPUT_DIR")
 
+    # ── Knowledge graph ───────────────────────────────────────────────────────
+    kg_gml_path: Path = Field(Path("./data/knowledge_graph.gml"), alias="KNOWLEDGE_GRAPH_PATH")
+
+    # ── Chat & session persistence ────────────────────────────────────────────
+    session_db_path: Path = Field(Path("./data/sessions.db"), alias="SESSION_DB_PATH")
+
     # ── Agent tuning ──────────────────────────────────────────────────────────
     max_rewrite_loops: int = Field(3, alias="MAX_REWRITE_LOOPS")
     chunk_size: int = Field(1500, alias="CHUNK_SIZE")

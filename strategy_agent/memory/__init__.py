@@ -1,1 +1,1 @@
-"""Memory layer: vector store persistence and session working memory."""
+"""Memory layer: vector store, knowledge graph, and session working memory."""

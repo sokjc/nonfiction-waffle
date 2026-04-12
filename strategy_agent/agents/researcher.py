@@ -26,6 +26,10 @@ from strategy_agent.tools.corpus_search import (
     search_corpus_with_context,
     set_store as set_corpus_store,
 )
+from strategy_agent.tools.knowledge_graph import (
+    query_knowledge_graph,
+    set_store as set_kg_store,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +95,7 @@ class ResearchAgent:
         as tools and lets the model iteratively search until it's satisfied.
         Falls back to retrieval mode if the model doesn't support tool calling.
         """
-        tools = [search_corpus, search_corpus_with_context]
+        tools = [search_corpus, search_corpus_with_context, query_knowledge_graph]
         agent_llm = self._llm.bind_tools(tools)
 
         from langchain_core.messages import HumanMessage, SystemMessage
@@ -122,8 +126,13 @@ class ResearchAgent:
             # Execute each tool call and feed results back
             from langchain_core.messages import ToolMessage
 
+            tool_map = {
+                "search_corpus": search_corpus,
+                "search_corpus_with_context": search_corpus_with_context,
+                "query_knowledge_graph": query_knowledge_graph,
+            }
             for tc in response.tool_calls:
-                tool_fn = search_corpus if tc["name"] == "search_corpus" else search_corpus_with_context
+                tool_fn = tool_map.get(tc["name"], search_corpus)
                 result = tool_fn.invoke(tc["args"])
                 messages.append(ToolMessage(content=result, tool_call_id=tc["id"]))
         else:
