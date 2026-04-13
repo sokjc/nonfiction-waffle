@@ -69,6 +69,84 @@ class KnowledgeGraphStore:
             self.add_triple(subj, pred, obj)
         return len(triples)
 
+    def has_triple(self, subject: str, predicate: str, obj: str) -> bool:
+        """Return True if an exact (subject, predicate, object) triple exists."""
+        s_low, p_low, o_low = subject.lower(), predicate.lower(), obj.lower()
+        for s, p, o in self.get_all_triples():
+            if s.lower() == s_low and p.lower() == p_low and o.lower() == o_low:
+                return True
+        return False
+
+    def add_triple_if_new(self, subject: str, predicate: str, obj: str) -> bool:
+        """Add a triple only if it does not already exist (case-insensitive).
+
+        Returns True if the triple was added, False if it was a duplicate.
+        """
+        if not subject or not predicate or not obj:
+            return False
+        if self.has_triple(subject, predicate, obj):
+            logger.debug("Skipping duplicate triple: (%r, %r, %r)", subject, predicate, obj)
+            return False
+        self._graph.add_triple(KnowledgeTriple(subject, predicate, obj))
+        return True
+
+    def add_triples_if_new(self, triples: list[tuple[str, str, str]]) -> tuple[int, int]:
+        """Add multiple triples, skipping duplicates.
+
+        Returns ``(added, skipped)`` counts.
+        """
+        added = skipped = 0
+        for subj, pred, obj in triples:
+            if self.add_triple_if_new(subj, pred, obj):
+                added += 1
+            else:
+                skipped += 1
+        return added, skipped
+
+    def remove_entity(self, entity: str) -> int:
+        """Remove all triples where *entity* appears as subject or object.
+
+        Returns the number of triples removed.
+        """
+        triples_before = self.num_triples
+        triples = self.get_all_triples()
+        self._graph.clear()
+
+        for s, p, o in triples:
+            if s.lower() != entity.lower() and o.lower() != entity.lower():
+                self._graph.add_triple(KnowledgeTriple(s, p, o))
+
+        removed = triples_before - self.num_triples
+        if removed:
+            logger.info("Removed %d triple(s) involving %r", removed, entity)
+        return removed
+
+    def deduplicate(self) -> int:
+        """Remove exact duplicate triples (case-insensitive comparison).
+
+        Keeps the first occurrence and removes subsequent duplicates.
+        Returns the number of duplicates removed.
+        """
+        triples = self.get_all_triples()
+        seen: set[tuple[str, str, str]] = set()
+        unique: list[tuple[str, str, str]] = []
+
+        for s, p, o in triples:
+            key = (s.lower(), p.lower(), o.lower())
+            if key not in seen:
+                seen.add(key)
+                unique.append((s, p, o))
+
+        removed = len(triples) - len(unique)
+        if removed > 0:
+            self._graph.clear()
+            for s, p, o in unique:
+                self._graph.add_triple(KnowledgeTriple(s, p, o))
+            logger.info("Removed %d duplicate triple(s)", removed)
+        else:
+            logger.info("No duplicate triples found")
+        return removed
+
     # ── Queries ───────────────────────────────────────────────────────────────
 
     def query_entity(self, entity: str) -> list[str]:
