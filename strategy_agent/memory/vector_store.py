@@ -27,7 +27,6 @@ from llama_index.core import (
 )
 from llama_index.core import Settings as LISettings
 from llama_index.core.node_parser import SentenceSplitter
-from llama_index.core.schema import TextNode
 
 from strategy_agent.config import Settings, get_settings
 from strategy_agent.models import build_embeddings
@@ -110,9 +109,15 @@ class CorpusStore:
                 self._source_documents[source_file] = ""
             self._source_documents[source_file] += doc.page_content + "\n\n"
 
-        # Insert into index (LlamaIndex handles chunking internally)
-        for doc in li_docs:
-            self._index.insert(doc)
+        # Parse documents into nodes and insert as a single batch.
+        # This is significantly faster than individual insert() calls because
+        # the embedding model can process multiple texts in one pass.
+        parser = SentenceSplitter(
+            chunk_size=self._settings.chunk_size,
+            chunk_overlap=self._settings.chunk_overlap,
+        )
+        nodes = parser.get_nodes_from_documents(li_docs)
+        self._index.insert_nodes(nodes)
 
         self._persist()
         logger.info("Indexed %d document(s), persisted to %s", len(li_docs), self._persist_dir)
