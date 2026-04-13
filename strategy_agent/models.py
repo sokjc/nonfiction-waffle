@@ -6,8 +6,9 @@ Three model roles, each backed by an OpenAI-compatible endpoint:
 - **Agent** (``build_agent_llm``) — research, chat, tool-calling
 - **Evaluator** (``build_eval_llm``) — narrative scoring
 
-Embeddings use Nomic ``nomic-embed-text-v1.5`` by default via LlamaIndex's
-HuggingFace integration (8K token context, ~62 MTEB).
+Embeddings default to an OpenAI-compatible API endpoint (``EMBEDDING_BASE_URL``).
+For local embeddings via sentence-transformers, install the ``local`` extra:
+``uv pip install -e ".[local]"``
 """
 
 from __future__ import annotations
@@ -67,12 +68,13 @@ _embeddings_cache: dict[tuple[str, str | None], object] = {}
 def build_embeddings(settings: Settings | None = None):
     """Return a LlamaIndex embedding model, cached by (model, base_url).
 
-    Defaults to ``nomic-ai/nomic-embed-text-v1.5`` running locally via
-    sentence-transformers (8K token context, ~62 MTEB score — a major
-    upgrade from the previous all-MiniLM-L6-v2 default).
+    When ``EMBEDDING_BASE_URL`` is set (recommended), uses a remote
+    OpenAI-compatible embedding endpoint — no local GPU or PyTorch needed.
 
-    When ``EMBEDDING_BASE_URL`` is set, uses a remote OpenAI-compatible
-    embedding endpoint instead.
+    Without ``EMBEDDING_BASE_URL``, falls back to local inference via
+    sentence-transformers, which requires the ``local`` extra::
+
+        uv pip install -e ".[local]"
     """
     s = settings or get_settings()
     cache_key = (s.embedding_model, s.embedding_base_url)
@@ -89,7 +91,14 @@ def build_embeddings(settings: Settings | None = None):
             model_name=s.embedding_model,
         )
     else:
-        from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+        try:
+            from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+        except ImportError:
+            raise ImportError(
+                "Local embeddings require the 'local' extra (sentence-transformers + PyTorch). "
+                "Install with: uv pip install -e \".[local]\"\n"
+                "Or set EMBEDDING_BASE_URL to use an API-based embedding endpoint instead."
+            ) from None
 
         emb = HuggingFaceEmbedding(
             model_name=s.embedding_model,

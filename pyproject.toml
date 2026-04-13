@@ -37,15 +37,10 @@ dependencies = [
     "beautifulsoup4>=4.12",
     "tiktoken>=0.8",
 
-    # --- Retrieval (LlamaIndex) & embeddings (Nomic) ---
+    # --- Retrieval (LlamaIndex) & embeddings ---
     "llama-index>=0.14",
-    "llama-index-embeddings-huggingface>=0.7",
+    "llama-index-embeddings-openai>=0.3",
     "llama-index-llms-openai-like>=0.7",
-    "sentence-transformers>=3.0",
-
-    # --- PyTorch: cap version on Intel Mac (x86_64 macOS) ---
-    # PyTorch 2.3+ dropped Intel Mac wheels; pin to last supported release
-    "torch>=2.0,<2.3; sys_platform == 'darwin' and platform_machine == 'x86_64'",
 
     # --- Knowledge graph ---
     "networkx>=3.2",
@@ -65,6 +60,12 @@ dependencies = [
 Repository = "https://github.com/sokjc/nonfiction-waffle"
 
 [project.optional-dependencies]
+local = [
+    # Local embeddings via sentence-transformers (pulls in PyTorch).
+    # Not needed when using an API-based embedding endpoint (EMBEDDING_BASE_URL).
+    "llama-index-embeddings-huggingface>=0.7",
+    "sentence-transformers>=3.0",
+]
 dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.24",

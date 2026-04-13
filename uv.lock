@@ -2890,7 +2890,7 @@ dependencies = [
     { name = "langgraph" },
     { name = "langgraph-checkpoint-sqlite" },
     { name = "llama-index" },
-    { name = "llama-index-embeddings-huggingface" },
+    { name = "llama-index-embeddings-openai" },
     { name = "llama-index-llms-openai-like" },
     { name = "networkx" },
     { name = "pydantic" },
@@ -2899,10 +2899,8 @@ dependencies = [
     { name = "python-docx" },
     { name = "python-dotenv" },
     { name = "rich" },
-    { name = "sentence-transformers" },
     { name = "tenacity" },
     { name = "tiktoken" },
-    { name = "torch", marker = "platform_machine == 'x86_64' and sys_platform == 'darwin'" },
     { name = "typer" },
 ]
 
@@ -2912,6 +2910,10 @@ dev = [
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
     { name = "ruff" },
+]
+local = [
+    { name = "llama-index-embeddings-huggingface" },
+    { name = "sentence-transformers" },
 ]
 
 [package.metadata]
@@ -2924,7 +2926,8 @@ requires-dist = [
     { name = "langgraph", specifier = ">=0.3,<0.4" },
     { name = "langgraph-checkpoint-sqlite", specifier = ">=2.0,<3.0" },
     { name = "llama-index", specifier = ">=0.14" },
-    { name = "llama-index-embeddings-huggingface", specifier = ">=0.7" },
+    { name = "llama-index-embeddings-huggingface", marker = "extra == 'local'", specifier = ">=0.7" },
+    { name = "llama-index-embeddings-openai", specifier = ">=0.3" },
     { name = "llama-index-llms-openai-like", specifier = ">=0.7" },
     { name = "networkx", specifier = ">=3.2" },
     { name = "pydantic", specifier = ">=2.9" },
@@ -2937,13 +2940,12 @@ requires-dist = [
     { name = "python-dotenv", specifier = ">=1.0" },
     { name = "rich", specifier = ">=13.9" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8" },
-    { name = "sentence-transformers", specifier = ">=3.0" },
+    { name = "sentence-transformers", marker = "extra == 'local'", specifier = ">=3.0" },
     { name = "tenacity", specifier = ">=9.0" },
     { name = "tiktoken", specifier = ">=0.8" },
-    { name = "torch", marker = "platform_machine == 'x86_64' and sys_platform == 'darwin'", specifier = ">=2.0,<2.3" },
     { name = "typer", extras = ["all"], specifier = ">=0.15" },
 ]
-provides-extras = ["dev"]
+provides-extras = ["local", "dev"]
 
 [[package]]
 name = "sympy"
