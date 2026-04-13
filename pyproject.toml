@@ -43,6 +43,10 @@ dependencies = [
     "llama-index-llms-openai-like>=0.7",
     "sentence-transformers>=3.0",
 
+    # --- PyTorch: cap version on Intel Mac (x86_64 macOS) ---
+    # PyTorch 2.3+ dropped Intel Mac wheels; pin to last supported release
+    "torch>=2.0,<2.3; sys_platform == 'darwin' and platform_machine == 'x86_64'",
+
     # --- Knowledge graph ---
     "networkx>=3.2",
 
