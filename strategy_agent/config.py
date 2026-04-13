@@ -76,6 +76,11 @@ class Settings(BaseSettings):
         Path("./data/knowledge_graph.gml"), alias="KNOWLEDGE_GRAPH_PATH"
     )
 
+    # ── Ingestion registry ────────────────────────────────────────────────
+    ingestion_registry_path: Path = Field(
+        Path("./data/ingestion_registry.json"), alias="INGESTION_REGISTRY_PATH"
+    )
+
     # ── Chat & session persistence ────────────────────────────────────────
     session_db_path: Path = Field(
         Path("./data/sessions.db"), alias="SESSION_DB_PATH"

@@ -169,6 +169,8 @@ class CorpusStore:
             "source_files": ranked_sources[:n],
         }
 
+    # ── Inspection ──────────────────────────────────────────────────────
+
     @property
     def count(self) -> int:
         """Number of nodes currently indexed."""
@@ -177,6 +179,90 @@ class CorpusStore:
             return len(docstore.docs)
         except Exception:
             return 0
+
+    def get_source_files(self) -> list[str]:
+        """Return a sorted list of unique source_file names in the index."""
+        sources: set[str] = set()
+        try:
+            docstore = self._index.storage_context.docstore
+            for node in docstore.docs.values():
+                src = node.metadata.get("source_file")
+                if src:
+                    sources.add(src)
+        except Exception:
+            pass
+        return sorted(sources)
+
+    def count_by_source(self) -> dict[str, int]:
+        """Return ``{source_file: node_count}`` for every source document."""
+        counts: dict[str, int] = {}
+        try:
+            docstore = self._index.storage_context.docstore
+            for node in docstore.docs.values():
+                src = node.metadata.get("source_file", "unknown")
+                counts[src] = counts.get(src, 0) + 1
+        except Exception:
+            pass
+        return dict(sorted(counts.items()))
+
+    # ── Deletion ─────────────────────────────────────────────────────────
+
+    def remove_document(self, source_file: str) -> int:
+        """Remove all indexed nodes belonging to *source_file*.
+
+        Returns the number of nodes removed.
+        """
+        docstore = self._index.storage_context.docstore
+        node_ids_to_remove = [
+            nid
+            for nid, node in docstore.docs.items()
+            if node.metadata.get("source_file") == source_file
+        ]
+        if not node_ids_to_remove:
+            logger.info("No nodes found for source_file=%r", source_file)
+            return 0
+
+        for nid in node_ids_to_remove:
+            self._index.delete_ref_doc(nid, delete_from_docstore=True)
+
+        self._source_documents.pop(source_file, None)
+        self._persist()
+        logger.info("Removed %d node(s) for %r", len(node_ids_to_remove), source_file)
+        return len(node_ids_to_remove)
+
+    def deduplicate(self) -> int:
+        """Remove duplicate nodes that share the same text and source_file.
+
+        Keeps the first occurrence (by node ID sort order) and deletes the rest.
+        Returns the number of duplicates removed.
+        """
+        docstore = self._index.storage_context.docstore
+        seen: dict[tuple[str, str], str] = {}  # (source_file, text_hash) → kept node_id
+        duplicates: list[str] = []
+
+        for nid in sorted(docstore.docs):
+            node = docstore.docs[nid]
+            import hashlib
+
+            text_hash = hashlib.sha256(node.get_content().encode()).hexdigest()
+            key = (node.metadata.get("source_file", ""), text_hash)
+            if key in seen:
+                duplicates.append(nid)
+            else:
+                seen[key] = nid
+
+        if not duplicates:
+            logger.info("No duplicate nodes found")
+            return 0
+
+        for nid in duplicates:
+            self._index.delete_ref_doc(nid, delete_from_docstore=True)
+
+        self._persist()
+        logger.info("Removed %d duplicate node(s)", len(duplicates))
+        return len(duplicates)
+
+    # ── Reset ────────────────────────────────────────────────────────────
 
     def reset(self) -> None:
         """Delete the index and recreate it (destructive)."""

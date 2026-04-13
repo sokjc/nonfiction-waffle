@@ -77,7 +77,12 @@ def ingest(
     reset: bool = typer.Option(
         False,
         "--reset",
-        help="Delete existing vector store and knowledge graph before ingesting.",
+        help="Delete existing vector store, knowledge graph, and registry before ingesting.",
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Re-ingest files even if they are already in the registry.",
     ),
     build_kg: bool = typer.Option(
         False,
@@ -91,37 +96,83 @@ def ingest(
 
     from strategy_agent.config import get_settings
     from strategy_agent.ingestion.chunker import chunk_documents
-    from strategy_agent.ingestion.loader import load_corpus
+    from strategy_agent.ingestion.loader import load_corpus, load_file
+    from strategy_agent.ingestion.registry import IngestionRegistry
     from strategy_agent.memory.vector_store import CorpusStore
 
     settings = get_settings()
+    registry = IngestionRegistry(settings.ingestion_registry_path)
 
-    with console.status("[bold green]Loading documents..."):
-        docs = load_corpus(corpus_dir)
+    store = CorpusStore(settings)
+    if reset:
+        console.print("[yellow]Resetting existing vector store...")
+        store.reset()
+        console.print("[yellow]Resetting ingestion registry...")
+        registry.reset()
+
+    # ── Load with duplicate detection ────────────────────────────────────
+    if force or reset:
+        with console.status("[bold green]Loading documents..."):
+            docs = load_corpus(corpus_dir)
+        skipped_files: list[str] = []
+    else:
+        docs = []
+        skipped_files = []
+        supported_paths = sorted(
+            p for p in corpus_dir.rglob("*")
+            if p.is_file() and not p.name.startswith(".")
+        )
+        with console.status("[bold green]Loading documents (checking for duplicates)..."):
+            for path in supported_paths:
+                if registry.is_ingested(path):
+                    skipped_files.append(path.name)
+                    continue
+                docs.extend(load_file(path))
+
+    if skipped_files:
+        console.print(
+            f"[dim]Skipped [bold]{len(skipped_files)}[/bold] already-ingested file(s): "
+            f"{', '.join(skipped_files[:5])}"
+            f"{'...' if len(skipped_files) > 5 else ''}"
+        )
 
     if not docs:
-        console.print("[yellow]No supported documents found in the corpus directory.")
-        raise typer.Exit(1)
+        if skipped_files:
+            console.print("[green]All files already ingested. Use --force to re-ingest.")
+        else:
+            console.print("[yellow]No supported documents found in the corpus directory.")
+        raise typer.Exit(0 if skipped_files else 1)
 
-    console.print(f"Loaded [bold]{len(docs)}[/bold] document(s)")
+    console.print(f"Loaded [bold]{len(docs)}[/bold] new document(s)")
 
     with console.status("[bold green]Chunking..."):
         chunks = chunk_documents(docs, settings)
 
     console.print(f"Split into [bold]{len(chunks)}[/bold] chunks")
 
-    store = CorpusStore(settings)
-    if reset:
-        console.print("[yellow]Resetting existing vector store...")
-        store.reset()
-
     with console.status("[bold green]Embedding and storing..."):
         stored = store.add_documents(chunks)
+
+    # ── Register ingested files ──────────────────────────────────────────
+    ingested_sources: set[str] = set()
+    for chunk in chunks:
+        src_path = chunk.metadata.get("source_path")
+        if src_path and src_path not in ingested_sources:
+            ingested_sources.add(src_path)
+    for src_path in ingested_sources:
+        p = Path(src_path)
+        chunk_count = sum(
+            1 for c in chunks if c.metadata.get("source_path") == src_path
+        )
+        if p.exists():
+            registry.register(p, chunk_count)
+    registry.save()
 
     console.print(
         Panel(
             f"[green]Successfully indexed {stored} document(s) in "
-            f"{settings.index_persist_dir}",
+            f"{settings.index_persist_dir}\n"
+            f"Registry: {registry.count} file(s) tracked",
             title="Vector Store Ingestion Complete",
         )
     )
@@ -138,20 +189,22 @@ def ingest(
             kg.reset()
 
         llm = build_writer_llm(settings)
-        total_triples = 0
+        total_added = 0
+        total_skipped = 0
 
         with console.status("[bold green]Extracting knowledge graph triples...") as status:
             for i, chunk in enumerate(chunks, 1):
                 status.update(f"[bold green]Extracting triples... chunk {i}/{len(chunks)}")
                 triples = extract_triples(chunk.page_content, llm)
-                kg.add_triples(triples)
-                total_triples += len(triples)
+                added, skipped = kg.add_triples_if_new(triples)
+                total_added += added
+                total_skipped += skipped
 
         kg.save()
         console.print(
             Panel(
-                f"[green]Extracted {total_triples} triples ({kg.num_entities} entities) "
-                f"into knowledge graph",
+                f"[green]Added {total_added} new triples ({total_skipped} duplicates skipped, "
+                f"{kg.num_entities} total entities) into knowledge graph",
                 title="Knowledge Graph Extraction Complete",
             )
         )
@@ -301,6 +354,130 @@ def corpus_info(
             title="Corpus Info",
         )
     )
+
+
+# ── Corpus remove command ────────────────────────────────────────────────────
+
+@app.command(name="corpus-remove")
+def corpus_remove(
+    source_file: str = typer.Argument(
+        ...,
+        help="Name of the source file to remove (e.g. 'report.pdf').",
+    ),
+    verbose: bool = typer.Option(False, "--verbose", "-v"),
+) -> None:
+    """Remove a specific document from the vector store, knowledge graph, and registry."""
+    _setup_logging(verbose)
+
+    from strategy_agent.config import get_settings
+    from strategy_agent.ingestion.registry import IngestionRegistry
+    from strategy_agent.memory.knowledge_graph import KnowledgeGraphStore
+    from strategy_agent.memory.vector_store import CorpusStore
+
+    settings = get_settings()
+
+    # ── Vector store ──────────────────────────────────────────────────────
+    store = CorpusStore(settings)
+    available = store.get_source_files()
+    if source_file not in available:
+        console.print(f"[yellow]'{source_file}' not found in vector store.")
+        if available:
+            console.print(f"[dim]Available files: {', '.join(available)}")
+        raise typer.Exit(1)
+
+    removed_nodes = store.remove_document(source_file)
+    console.print(f"Removed [bold]{removed_nodes}[/bold] node(s) from vector store")
+
+    # ── Knowledge graph (remove entity matching file stem) ────────────────
+    kg = KnowledgeGraphStore(settings)
+    if kg.num_triples > 0:
+        # Remove triples mentioning the file name (without extension)
+        removed_triples = kg.remove_entity(Path(source_file).stem)
+        if removed_triples:
+            kg.save()
+            console.print(
+                f"Removed [bold]{removed_triples}[/bold] triple(s) from knowledge graph"
+            )
+
+    # ── Registry ──────────────────────────────────────────────────────────
+    registry = IngestionRegistry(settings.ingestion_registry_path)
+    if registry.unregister_by_source(source_file):
+        registry.save()
+        console.print("Removed from ingestion registry")
+
+    console.print(Panel(f"[green]'{source_file}' removed successfully", title="Done"))
+
+
+# ── Corpus dedup command ─────────────────────────────────────────────────────
+
+@app.command(name="corpus-dedup")
+def corpus_dedup(
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Report duplicates without removing them.",
+    ),
+    verbose: bool = typer.Option(False, "--verbose", "-v"),
+) -> None:
+    """Find and remove duplicate entries in the vector store and knowledge graph."""
+    _setup_logging(verbose)
+
+    from strategy_agent.config import get_settings
+    from strategy_agent.memory.knowledge_graph import KnowledgeGraphStore
+    from strategy_agent.memory.vector_store import CorpusStore
+
+    settings = get_settings()
+
+    # ── Vector store dedup ────────────────────────────────────────────────
+    store = CorpusStore(settings)
+    if dry_run:
+        # Count duplicates without removing
+        import hashlib
+
+        docstore = store._index.storage_context.docstore
+        seen: dict[tuple[str, str], str] = {}
+        dup_count = 0
+        for nid in sorted(docstore.docs):
+            node = docstore.docs[nid]
+            text_hash = hashlib.sha256(node.get_content().encode()).hexdigest()
+            key = (node.metadata.get("source_file", ""), text_hash)
+            if key in seen:
+                dup_count += 1
+            else:
+                seen[key] = nid
+        console.print(f"Vector store: [bold]{dup_count}[/bold] duplicate node(s) found")
+    else:
+        removed_vdb = store.deduplicate()
+        console.print(f"Vector store: removed [bold]{removed_vdb}[/bold] duplicate node(s)")
+
+    # ── Knowledge graph dedup ─────────────────────────────────────────────
+    kg = KnowledgeGraphStore(settings)
+    if kg.num_triples > 0:
+        if dry_run:
+            triples = kg.get_all_triples()
+            seen_triples: set[tuple[str, str, str]] = set()
+            dup_triple_count = 0
+            for s, p, o in triples:
+                key = (s.lower(), p.lower(), o.lower())
+                if key in seen_triples:
+                    dup_triple_count += 1
+                else:
+                    seen_triples.add(key)
+            console.print(
+                f"Knowledge graph: [bold]{dup_triple_count}[/bold] duplicate triple(s) found"
+            )
+        else:
+            removed_kg = kg.deduplicate()
+            if removed_kg:
+                kg.save()
+            console.print(
+                f"Knowledge graph: removed [bold]{removed_kg}[/bold] duplicate triple(s)"
+            )
+    else:
+        console.print("[dim]Knowledge graph is empty — nothing to deduplicate")
+
+    if dry_run:
+        console.print("\n[dim]Dry run — no changes made. Remove --dry-run to clean up.")
 
 
 # ── Style check command ──────────────────────────────────────────────────────
