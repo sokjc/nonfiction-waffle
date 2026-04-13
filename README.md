@@ -29,20 +29,36 @@ A LangChain deep agent framework that reads a corpus of corporate strategy docum
 
 **Four specialist agents** run the document pipeline: a Researcher mines the corpus, a Writer drafts in the house style, an Evaluator scores on a 0-10 rubric (storytelling, cohesion, data integration, style compliance), and a Rewriter revises based on feedback. The loop continues until the draft scores 8+/10 or hits the iteration cap.
 
+## Prerequisites
+
+This project uses [uv](https://docs.astral.sh/uv/) for dependency management. Install it with a single command:
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+Or via Homebrew:
+
+```bash
+brew install uv
+```
+
+> **uv** is an extremely fast Python package and project manager written in Rust. It replaces pip, pip-tools, pipx, poetry, pyenv, and virtualenv in a single tool.
+
 ## Quick Start
 
 ```bash
-# 1. Install
-pip install -e ".[dev]"          # or: uv sync --dev
+# 1. Install (uv automatically creates a virtualenv and resolves dependencies)
+uv sync --dev
 
 # 2. Configure
 cp .env.example .env             # edit model endpoints for your servers
 
 # 3. Ingest your strategy documents
-strategy-agent ingest ./corpus
+uv run strategy-agent ingest ./corpus
 
 # 4. Chat with the agent
-strategy-agent chat
+uv run strategy-agent chat
 ```
 
 ### Three-Model Architecture
@@ -73,20 +89,20 @@ All three models can run on the same server (same URL, different model names) or
 
 | Command | Description |
 |---------|-------------|
-| `strategy-agent ingest <dir>` | Load documents into the vector store |
-| `strategy-agent ingest <dir> --build-kg` | Also extract a knowledge graph (requires LLM) |
-| `strategy-agent generate -b "brief"` | Generate a strategy document (batch mode) |
-| `strategy-agent chat` | Interactive chat session |
-| `strategy-agent chat --list` | List all saved sessions |
-| `strategy-agent chat -s <id>` | Resume a previous session |
-| `strategy-agent corpus-info` | Show vector store statistics |
-| `strategy-agent kg-info` | Show knowledge graph statistics |
-| `strategy-agent style-check <file>` | Lint a document against the house style |
+| `uv run strategy-agent ingest <dir>` | Load documents into the vector store |
+| `uv run strategy-agent ingest <dir> --build-kg` | Also extract a knowledge graph (requires LLM) |
+| `uv run strategy-agent generate -b "brief"` | Generate a strategy document (batch mode) |
+| `uv run strategy-agent chat` | Interactive chat session |
+| `uv run strategy-agent chat --list` | List all saved sessions |
+| `uv run strategy-agent chat -s <id>` | Resume a previous session |
+| `uv run strategy-agent corpus-info` | Show vector store statistics |
+| `uv run strategy-agent kg-info` | Show knowledge graph statistics |
+| `uv run strategy-agent style-check <file>` | Lint a document against the house style |
 
 ### Generate Options
 
 ```bash
-strategy-agent generate \
+uv run strategy-agent generate \
     --brief "Evaluate whether we should expand into the European market" \
     --type strategy_memo \          # or: white_paper, board_presentation,
                                     #     competitive_analysis, market_assessment
@@ -111,7 +127,7 @@ The chat agent remembers your entire conversation across sessions. It can:
 | `/export` | Export conversation to markdown |
 | `/quit` | End the session |
 
-Resume any session later with `strategy-agent chat --session <thread_id>`.
+Resume any session later with `uv run strategy-agent chat --session <thread_id>`.
 
 ## Knowledge Graph
 
@@ -123,7 +139,7 @@ The hybrid memory system gives agents two complementary ways to query the corpus
 Build the knowledge graph during ingestion:
 
 ```bash
-strategy-agent ingest ./corpus --build-kg
+uv run strategy-agent ingest ./corpus --build-kg
 ```
 
 This uses the LLM to extract entity-relationship triples (companies, markets, strategies, metrics) from every document chunk. The graph persists as a GML file and grows during chat conversations when new strategic intelligence is shared.
@@ -156,13 +172,13 @@ All settings are controlled via environment variables or a `.env` file. See [`.e
 
 ```bash
 # Install with dev dependencies
-pip install -e ".[dev]"
+uv sync --dev
 
 # Run tests
-pytest tests/ -v
+uv run pytest tests/ -v
 
 # Lint
-ruff check strategy_agent/ tests/
+uv run ruff check strategy_agent/ tests/
 ```
 
 ### Project Structure
