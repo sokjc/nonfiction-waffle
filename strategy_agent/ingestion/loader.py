@@ -3,11 +3,14 @@
 Supports PDF, DOCX, Markdown, plain text, and HTML.  Each loader normalises
 its output into LangChain ``Document`` objects with consistent metadata so
 downstream chunkers and retrievers can treat every source identically.
+
+File loading is parallelized with a thread pool for faster corpus ingestion.
 """
 
 from __future__ import annotations
 
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from langchain_core.documents import Document
@@ -60,15 +63,38 @@ def load_file(path: Path) -> list[Document]:
     return docs
 
 
-def load_corpus(corpus_dir: Path) -> list[Document]:
-    """Recursively load every supported file under *corpus_dir*."""
+def load_corpus(corpus_dir: Path, *, max_workers: int = 8) -> list[Document]:
+    """Recursively load every supported file under *corpus_dir*.
+
+    Files are loaded concurrently using a thread pool (I/O-bound work).
+    Results are returned in deterministic sorted-path order.
+    """
     if not corpus_dir.exists():
         raise FileNotFoundError(f"Corpus directory not found: {corpus_dir}")
 
+    paths = sorted(
+        p for p in corpus_dir.rglob("*") if p.is_file() and not p.name.startswith(".")
+    )
+
+    if not paths:
+        return []
+
+    # Load files concurrently; collect results keyed by index to preserve order.
     all_docs: list[Document] = []
-    for path in sorted(corpus_dir.rglob("*")):
-        if path.is_file() and not path.name.startswith("."):
-            all_docs.extend(load_file(path))
+    with ThreadPoolExecutor(max_workers=min(max_workers, len(paths))) as executor:
+        future_to_idx = {
+            executor.submit(load_file, path): idx for idx, path in enumerate(paths)
+        }
+        results: list[list[Document]] = [[] for _ in paths]
+        for future in as_completed(future_to_idx):
+            idx = future_to_idx[future]
+            try:
+                results[idx] = future.result()
+            except Exception as e:
+                logger.warning("Failed to load %s: %s", paths[idx], e)
+
+    for docs in results:
+        all_docs.extend(docs)
 
     logger.info("Corpus loaded: %d document chunks from %s", len(all_docs), corpus_dir)
     return all_docs

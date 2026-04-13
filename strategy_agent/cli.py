@@ -179,7 +179,7 @@ def ingest(
 
     # ── Optional knowledge graph extraction ───────────────────────────────
     if build_kg:
-        from strategy_agent.ingestion.kg_extractor import extract_triples
+        from strategy_agent.ingestion.kg_extractor import extract_triples_batch
         from strategy_agent.memory.knowledge_graph import KnowledgeGraphStore
         from strategy_agent.models import build_writer_llm
 
@@ -193,9 +193,16 @@ def ingest(
         total_skipped = 0
 
         with console.status("[bold green]Extracting knowledge graph triples...") as status:
-            for i, chunk in enumerate(chunks, 1):
-                status.update(f"[bold green]Extracting triples... chunk {i}/{len(chunks)}")
-                triples = extract_triples(chunk.page_content, llm)
+            def _update_progress(done: int, total: int) -> None:
+                status.update(
+                    f"[bold green]Extracting triples... chunk {done}/{total}"
+                )
+
+            texts = [chunk.page_content for chunk in chunks]
+            all_triples = extract_triples_batch(
+                texts, llm, max_workers=10, on_progress=_update_progress,
+            )
+            for triples in all_triples:
                 added, skipped = kg.add_triples_if_new(triples)
                 total_added += added
                 total_skipped += skipped

@@ -3,12 +3,16 @@
 Uses the configured LLM to extract (subject, predicate, object) triples
 from text chunks during corpus ingestion.  The prompt is tuned for
 corporate strategy documents — companies, markets, products, metrics.
+
+Supports batch extraction via :func:`extract_triples_batch` which runs
+multiple LLM calls concurrently using a thread pool.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
@@ -84,3 +88,45 @@ def extract_triples(text: str, llm: ChatOpenAI) -> list[tuple[str, str, str]]:
         logger.debug("Triple extraction failed: %s", e)
 
     return []
+
+
+def extract_triples_batch(
+    texts: list[str],
+    llm: ChatOpenAI,
+    *,
+    max_workers: int = 10,
+    on_progress: callable | None = None,
+) -> list[list[tuple[str, str, str]]]:
+    """Extract triples from multiple texts concurrently.
+
+    Args:
+        texts: List of text chunks to extract triples from.
+        llm: The LLM to use for extraction.
+        max_workers: Maximum number of concurrent LLM calls.
+        on_progress: Optional callback ``(completed, total)`` called after
+            each chunk finishes.
+
+    Returns:
+        A list of triple-lists, one per input text, in the same order as *texts*.
+    """
+    total = len(texts)
+    results: list[list[tuple[str, str, str]]] = [[] for _ in range(total)]
+    completed = 0
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_idx = {
+            executor.submit(extract_triples, text, llm): idx
+            for idx, text in enumerate(texts)
+        }
+        for future in as_completed(future_to_idx):
+            idx = future_to_idx[future]
+            try:
+                results[idx] = future.result()
+            except Exception as e:
+                logger.warning("Triple extraction failed for chunk %d: %s", idx, e)
+                results[idx] = []
+            completed += 1
+            if on_progress:
+                on_progress(completed, total)
+
+    return results
