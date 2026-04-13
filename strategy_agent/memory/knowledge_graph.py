@@ -58,6 +58,9 @@ class KnowledgeGraphStore:
 
     def add_triple(self, subject: str, predicate: str, obj: str) -> None:
         """Add a single (subject, predicate, object) relationship."""
+        if not subject or not predicate or not obj:
+            logger.debug("Skipping invalid triple: (%r, %r, %r)", subject, predicate, obj)
+            return
         self._graph.add_triple(KnowledgeTriple(subject, predicate, obj))
 
     def add_triples(self, triples: list[tuple[str, str, str]]) -> int:
