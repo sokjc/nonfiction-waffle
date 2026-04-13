@@ -25,6 +25,7 @@ _LOADER_REGISTRY: dict[str, tuple[str, dict]] = {
     ".html": ("langchain_community.document_loaders.BSHTMLLoader", {}),
     ".htm": ("langchain_community.document_loaders.BSHTMLLoader", {}),
     ".csv": ("langchain_community.document_loaders.CSVLoader", {}),
+    ".pptx": ("strategy_agent.ingestion.pptx_loader.PptxLoader", {}),
 }
 
 
