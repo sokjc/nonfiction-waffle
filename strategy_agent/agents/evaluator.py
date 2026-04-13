@@ -108,7 +108,7 @@ class EvaluatorAgent:
                 "current_iteration": memory.current_iteration,
                 "draft": draft,
             },
-            endpoint_url=self._settings.eval_base_url_resolved,
+            endpoint_url=self._settings.eval_base_url,
         )
 
         evaluation = _parse_evaluation(raw)

@@ -120,8 +120,8 @@ def ingest(
 
     console.print(
         Panel(
-            f"[green]Successfully stored {stored} chunks in collection "
-            f"'{settings.chroma_collection}'",
+            f"[green]Successfully indexed {stored} document(s) in "
+            f"{settings.index_persist_dir}",
             title="Vector Store Ingestion Complete",
         )
     )
@@ -295,9 +295,8 @@ def corpus_info(
     count = store.count
     console.print(
         Panel(
-            f"Collection: [bold]{settings.chroma_collection}[/bold]\n"
-            f"Chunks stored: [bold]{count:,}[/bold]\n"
-            f"Persist directory: {settings.chroma_persist_dir}\n"
+            f"Documents indexed: [bold]{count:,}[/bold]\n"
+            f"Persist directory: {settings.index_persist_dir}\n"
             f"Embedding model: {settings.embedding_model}",
             title="Corpus Info",
         )

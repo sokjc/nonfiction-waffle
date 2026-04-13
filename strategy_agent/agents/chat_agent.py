@@ -17,7 +17,7 @@ from langgraph.prebuilt import create_react_agent
 from strategy_agent.config import Settings, get_settings
 from strategy_agent.memory.knowledge_graph import KnowledgeGraphStore
 from strategy_agent.memory.vector_store import CorpusStore
-from strategy_agent.models import build_writer_llm
+from strategy_agent.models import build_agent_llm
 from strategy_agent.prompts.chat import CHAT_SYSTEM_PROMPT
 from strategy_agent.session import SessionManager
 from strategy_agent.tools.corpus_search import (
@@ -100,7 +100,7 @@ def build_chat_agent(
         )
     """
     s = settings or get_settings()
-    llm = build_writer_llm(s)
+    llm = build_agent_llm(s)  # Agent model for chat and tool-calling
 
     # Wire up tool stores
     corpus_store = CorpusStore(s)

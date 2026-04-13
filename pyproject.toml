@@ -39,8 +39,10 @@ dependencies = [
     "beautifulsoup4>=4.12",
     "tiktoken>=0.8",
 
-    # --- Vector store & embeddings ---
-    "chromadb>=0.6",
+    # --- Retrieval (LlamaIndex) & embeddings (Nomic) ---
+    "llama-index>=0.14",
+    "llama-index-embeddings-huggingface>=0.7",
+    "llama-index-llms-openai-like>=0.7",
     "sentence-transformers>=3.0",
 
     # --- Knowledge graph ---

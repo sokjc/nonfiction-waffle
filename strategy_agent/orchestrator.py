@@ -35,7 +35,7 @@ from strategy_agent.agents.writer import WriterAgent
 from strategy_agent.config import Settings, get_settings
 from strategy_agent.memory.vector_store import CorpusStore
 from strategy_agent.memory.working_memory import WorkingMemory
-from strategy_agent.models import build_eval_llm, build_writer_llm
+from strategy_agent.models import build_agent_llm, build_eval_llm, build_writer_llm
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +58,7 @@ def research_node(state: PipelineState) -> PipelineState:
     settings = state["settings"]
 
     store = CorpusStore(settings)
-    llm = build_writer_llm(settings)
+    llm = build_agent_llm(settings)  # Agent model for research / tool-calling
     agent = ResearchAgent(llm=llm, store=store, settings=settings)
 
     # Use agentic mode if the corpus has documents, else retrieval
@@ -80,7 +80,7 @@ def write_node(state: PipelineState) -> PipelineState:
     memory = state["memory"]
     settings = state["settings"]
 
-    llm = build_writer_llm(settings)
+    llm = build_writer_llm(settings)  # Writer model for prose generation
     agent = WriterAgent(llm=llm, settings=settings)
     agent.run(memory)
 
@@ -92,7 +92,7 @@ def evaluate_node(state: PipelineState) -> PipelineState:
     memory = state["memory"]
     settings = state["settings"]
 
-    llm = build_eval_llm(settings)
+    llm = build_eval_llm(settings)  # Evaluator model — different from writer
     agent = EvaluatorAgent(llm=llm, settings=settings)
     agent.run(memory)
 
@@ -104,7 +104,7 @@ def rewrite_node(state: PipelineState) -> PipelineState:
     memory = state["memory"]
     settings = state["settings"]
 
-    llm = build_writer_llm(settings)
+    llm = build_writer_llm(settings)  # Same writer model for revisions
     agent = RewriterAgent(llm=llm, settings=settings)
     agent.run(memory)
 
