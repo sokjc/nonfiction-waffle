@@ -13,16 +13,18 @@ A LangChain deep agent framework that reads a corpus of corporate strategy docum
                               |
              +----------------+----------------+
              |                |                |
-       search_corpus   query_knowledge   generate_document
-             |           _graph               |
-             v                v               v
-      +----------+    +-----------+    +--------------------------+
-      | ChromaDB |    | NetworkX  |    |   Document Pipeline      |
-      | Vector   |    | Knowledge |    |                          |
-      | Store    |    | Graph     |    |  Research --> Write -->   |
-      | (fuzzy   |    | (struct-  |    |  Evaluate --> Rewrite    |
-      |  search) |    |  ured)    |    |       (loop until 8/10)  |
-      +----------+    +-----------+    +--------------------------+
+      search_corpus    query_knowledge   generate_document
+      verify_claim       _graph               |
+      check_style      add_knowledge          v
+             |                |        +--------------------------+
+             v                v        |   Document Pipeline      |
+      +------------+  +-----------+    |                          |
+      | LlamaIndex |  | NetworkX  |    |  Research --> Write -->   |
+      | Vector     |  | Knowledge |    |  Evaluate --> Rewrite    |
+      | Store      |  | Graph     |    |       (loop until 8/10)  |
+      | (semantic  |  | (struct-  |    +--------------------------+
+      |  search)   |  |  ured)    |
+      +------------+  +-----------+
 ```
 
 **Dual memory** — the vector store finds passages semantically similar to a query; the knowledge graph answers structured questions about entity relationships (who competes with whom, what markets a company operates in).
@@ -187,7 +189,7 @@ uv run ruff check strategy_agent/ tests/
 strategy_agent/
   agents/          # Researcher, Writer, Evaluator, Rewriter, Chat Agent
   ingestion/       # Document loaders, chunking, KG extraction
-  memory/          # Vector store (ChromaDB), knowledge graph (NetworkX), working memory
+  memory/          # Vector store (LlamaIndex), knowledge graph (NetworkX), working memory
   prompts/         # Style guide + prompt templates for every agent
   tools/           # Corpus search, KG query, style check, fact verification
   cli.py           # Typer CLI entry point
