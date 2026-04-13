@@ -1,8 +1,8 @@
-"""Corpus search tool — lets the research agent query the vector store.
+"""Corpus search tool — lets agents query the LlamaIndex vector store.
 
-This wraps the ChromaDB retriever as a LangChain ``Tool`` so it can be bound
-to an agent that decides *what* to search for rather than relying on a single
-static query derived from the brief.
+Wraps the CorpusStore retriever as a LangChain ``Tool`` so it can be bound
+to an agent that decides *what* to search for rather than relying on a
+single static query derived from the brief.
 """
 
 from __future__ import annotations
@@ -51,14 +51,13 @@ def search_corpus(query: str) -> str:
         prefixed with its source file name.
     """
     store = _get_store()
-    docs = store.similarity_search(query, k=8)
-    if not docs:
+    results = store.similarity_search(query, k=8)
+    if not results:
         return "No relevant passages found in the corpus for this query."
 
     passages: list[str] = []
-    for i, doc in enumerate(docs, 1):
-        source = doc.metadata.get("source_file", "unknown")
-        passages.append(f"[{i}] (Source: {source})\n{doc.page_content}")
+    for i, r in enumerate(results, 1):
+        passages.append(f"[{i}] (Source: {r['source_file']})\n{r['text']}")
 
     return "\n\n---\n\n".join(passages)
 
@@ -80,13 +79,12 @@ def search_corpus_with_context(query: str, context: str) -> str:
     """
     combined = f"{query} — Context: {context}"
     store = _get_store()
-    docs = store.similarity_search(combined, k=10)
-    if not docs:
+    results = store.similarity_search(combined, k=10)
+    if not results:
         return "No relevant passages found in the corpus."
 
     passages: list[str] = []
-    for i, doc in enumerate(docs, 1):
-        source = doc.metadata.get("source_file", "unknown")
-        passages.append(f"[{i}] (Source: {source})\n{doc.page_content}")
+    for i, r in enumerate(results, 1):
+        passages.append(f"[{i}] (Source: {r['source_file']})\n{r['text']}")
 
     return "\n\n---\n\n".join(passages)

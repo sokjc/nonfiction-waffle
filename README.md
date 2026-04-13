@@ -36,7 +36,7 @@ A LangChain deep agent framework that reads a corpus of corporate strategy docum
 pip install -e ".[dev]"          # or: uv sync --dev
 
 # 2. Configure
-cp .env.example .env             # edit LLM_BASE_URL for your model server
+cp .env.example .env             # edit model endpoints for your servers
 
 # 3. Ingest your strategy documents
 strategy-agent ingest ./corpus
@@ -45,17 +45,29 @@ strategy-agent ingest ./corpus
 strategy-agent chat
 ```
 
+### Three-Model Architecture
+
+The framework uses three distinct model roles, each connectable to any OpenAI-compatible endpoint:
+
+| Role | Default Model | Purpose | Config Prefix |
+|------|--------------|---------|---------------|
+| **Writer** | `gpt-oss` | Prose generation and rewriting | `WRITER_*` |
+| **Agent** | `gemma4-31b` | Research, chat, tool-calling | `AGENT_*` |
+| **Evaluator** | `nemotron-120b` | Narrative scoring and quality assessment | `EVAL_*` |
+
+This avoids the "grading your own homework" problem — the evaluator is a *different model* than the writer, producing more honest quality assessments.
+
 ### Model Server Setup
 
-This framework connects to any OpenAI-compatible endpoint. Common setups:
+All three roles connect via OpenAI-compatible endpoints. Common setups:
 
-| Server | Command | `LLM_BASE_URL` |
-|--------|---------|-----------------|
+| Server | Command | Base URL |
+|--------|---------|----------|
 | **Ollama** | `ollama serve` | `http://localhost:11434/v1` |
 | **vLLM** | `vllm serve gemma4-31b` | `http://localhost:8000/v1` |
 | **LM Studio** | Start from GUI | `http://localhost:1234/v1` |
 
-Set `LLM_MODEL` to whatever model name your server recognizes (e.g. `gemma4-31b`, `nemotron-120b`).
+All three models can run on the same server (same URL, different model names) or on separate GPU servers (different URLs).
 
 ## CLI Reference
 
@@ -105,7 +117,7 @@ Resume any session later with `strategy-agent chat --session <thread_id>`.
 
 The hybrid memory system gives agents two complementary ways to query the corpus:
 
-- **Vector store** (ChromaDB) — *"Find passages about European market entry"* — fuzzy, semantic
+- **Vector store** (LlamaIndex) — *"Find passages about European market entry"* — fuzzy, semantic
 - **Knowledge graph** (NetworkX) — *"What entities are connected to Acme Corp?"* — structured, relational
 
 Build the knowledge graph during ingestion:
@@ -134,9 +146,9 @@ All settings are controlled via environment variables or a `.env` file. See [`.e
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `LLM_BASE_URL` | `http://localhost:8000/v1` | Your model server endpoint |
-| `LLM_MODEL` | `gemma4-31b` | Primary model for writing |
-| `EVAL_MODEL` | *(falls back to LLM_MODEL)* | Heavier model for evaluation |
+| `WRITER_MODEL` | `gpt-oss` | Model for prose generation |
+| `AGENT_MODEL` | `gemma4-31b` | Model for research and chat |
+| `EVAL_MODEL` | `nemotron-120b` | Model for quality evaluation |
 | `MAX_REWRITE_LOOPS` | `3` | Max revision passes |
 | `CHUNK_SIZE` | `1500` | Document chunk size (characters) |
 

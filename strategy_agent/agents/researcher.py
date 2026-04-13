@@ -1,12 +1,9 @@
 """Research Agent — mines the corpus and produces a structured research brief.
 
-The researcher operates in two modes:
-
-1. **Retrieval mode** (default): Uses the vector-store retriever to pull
-   relevant passages based on the brief, then synthesizes them via LLM.
-2. **Agentic mode**: Given the search tools, the LLM decides what queries
-   to run, iterating until it has enough material.  This mode is better for
-   complex briefs that span multiple topics.
+The researcher uses **hybrid retrieval**: LlamaIndex finds the most relevant
+chunks, then expands to full source documents for long-context stuffing.
+The LLM sees both precision (specific relevant passages) and completeness
+(full documents so it doesn't miss context around those passages).
 """
 
 from __future__ import annotations
@@ -20,7 +17,7 @@ from strategy_agent.config import Settings, get_settings
 from strategy_agent.errors import invoke_llm
 from strategy_agent.memory.vector_store import CorpusStore
 from strategy_agent.memory.working_memory import WorkingMemory
-from strategy_agent.models import build_writer_llm
+from strategy_agent.models import build_agent_llm
 from strategy_agent.prompts.researcher import research_prompt
 from strategy_agent.tools.corpus_search import (
     search_corpus,
@@ -36,7 +33,12 @@ logger = logging.getLogger(__name__)
 
 
 class ResearchAgent:
-    """Retrieves and synthesizes corpus knowledge for a writing brief."""
+    """Retrieves and synthesizes corpus knowledge for a writing brief.
+
+    Uses hybrid retrieval: chunk-level similarity search to find relevant
+    passages, then document-level expansion to stuff full source documents
+    into the LLM context window.
+    """
 
     def __init__(
         self,
@@ -45,37 +47,65 @@ class ResearchAgent:
         settings: Settings | None = None,
     ):
         self._settings = settings or get_settings()
-        self._llm = llm or build_writer_llm(self._settings)
+        self._llm = llm or build_agent_llm(self._settings)
         self._store = store or CorpusStore(self._settings)
 
         # Wire the tools to use our store instance
         set_corpus_store(self._store)
 
-        # Build the retrieval-mode chain (simpler, faster, deterministic)
+        # Build the synthesis chain
         self._chain = research_prompt | self._llm | StrOutputParser()
 
-    # ── Retrieval mode ────────────────────────────────────────────────────────
-
     def run(self, memory: WorkingMemory) -> WorkingMemory:
-        """Execute retrieval-mode research and update working memory."""
-        # Step 1: Retrieve relevant passages from the corpus
-        retriever = self._store.as_retriever(top_k=self._settings.retrieval_top_k)
+        """Execute hybrid retrieval research and update working memory.
+
+        1. Run chunk-level similarity search for the brief
+        2. Expand top-scoring chunks to full source documents
+        3. Build a context package with both chunks (for citation) and
+           full documents (for completeness)
+        4. Synthesize via LLM into a research brief
+        """
         query = f"{memory.brief} {memory.document_type} {memory.additional_instructions}"
-        docs = retriever.invoke(query)
 
-        context_passages = []
-        for doc in docs:
-            source = doc.metadata.get("source_file", "unknown")
-            context_passages.append(f"[Source: {source}]\n{doc.page_content}")
+        # Hybrid retrieval: chunks + full document expansion
+        result = self._store.hybrid_retrieve(query, self._settings)
+        chunks = result["chunks"]
+        full_docs = result["full_documents"]
 
-        memory.retrieved_context = context_passages
-        retrieved_text = "\n\n---\n\n".join(context_passages) if context_passages else (
+        # Build the context for the LLM
+        context_parts: list[str] = []
+
+        # Full source documents (long-context stuffing)
+        if full_docs:
+            context_parts.append("## Full Source Documents\n")
+            for doc in full_docs:
+                context_parts.append(
+                    f"### {doc['source_file']}\n\n{doc['text']}\n"
+                )
+            context_parts.append("\n---\n")
+
+        # Chunk-level passages (for precision + citation)
+        if chunks:
+            context_parts.append("## Most Relevant Passages (ranked by similarity)\n")
+            for i, chunk in enumerate(chunks, 1):
+                source = chunk["source_file"]
+                score = chunk["score"]
+                context_parts.append(
+                    f"[{i}] (Source: {source}, relevance: {score:.2f})\n{chunk['text']}\n"
+                )
+
+        memory.retrieved_context = [c["text"] for c in chunks]
+        retrieved_text = "\n\n".join(context_parts) if context_parts else (
             "No documents found in the corpus.  The writer will need to rely "
             "on general knowledge and the brief alone."
         )
 
-        # Step 2: Synthesize via LLM
-        logger.info("Synthesizing research from %d retrieved passages", len(docs))
+        # Synthesize via LLM
+        logger.info(
+            "Synthesizing research from %d chunks + %d full documents",
+            len(chunks),
+            len(full_docs),
+        )
         synthesis = invoke_llm(
             self._chain,
             {
@@ -84,7 +114,7 @@ class ResearchAgent:
                 "additional_instructions": memory.additional_instructions,
                 "retrieved_context": retrieved_text,
             },
-            endpoint_url=self._settings.llm_base_url,
+            endpoint_url=self._settings.agent_base_url,
         )
 
         memory.research_synthesis = synthesis
@@ -96,9 +126,9 @@ class ResearchAgent:
     def run_agentic(self, memory: WorkingMemory) -> WorkingMemory:
         """Use tool-calling to let the LLM drive its own research queries.
 
-        This mode binds ``search_corpus`` and ``search_corpus_with_context``
-        as tools and lets the model iteratively search until it's satisfied.
-        Falls back to retrieval mode if the model doesn't support tool calling.
+        This mode binds ``search_corpus``, ``search_corpus_with_context``,
+        and ``query_knowledge_graph`` as tools and lets the model iteratively
+        search until it's satisfied.
         """
         tools = [search_corpus, search_corpus_with_context, query_knowledge_graph]
         agent_llm = self._llm.bind_tools(tools)
@@ -124,11 +154,9 @@ class ResearchAgent:
             messages.append(response)
 
             if not response.tool_calls:
-                # Model is done searching — final message is the synthesis
                 memory.research_synthesis = response.content
                 break
 
-            # Execute each tool call and feed results back
             from langchain_core.messages import ToolMessage
 
             tool_map = {
@@ -141,7 +169,6 @@ class ResearchAgent:
                 result = tool_fn.invoke(tc["args"])
                 messages.append(ToolMessage(content=result, tool_call_id=tc["id"]))
         else:
-            # Fallback: extract whatever the model produced
             memory.research_synthesis = messages[-1].content if messages else ""
 
         logger.info("Agentic research complete (%d chars)", len(memory.research_synthesis))

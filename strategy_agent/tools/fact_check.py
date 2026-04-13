@@ -48,18 +48,17 @@ def verify_claim(claim: str) -> str:
         that the claim could not be verified.
     """
     store = _get_store()
-    docs = store.similarity_search(claim, k=5)
+    results = store.similarity_search(claim, k=5)
 
-    if not docs:
+    if not results:
         return (
             f"UNVERIFIED: No corpus passages found that address the claim: \"{claim}\". "
             "This claim may need to be removed or qualified as an inference."
         )
 
     evidence_lines: list[str] = []
-    for i, doc in enumerate(docs, 1):
-        source = doc.metadata.get("source_file", "unknown")
-        evidence_lines.append(f"[{i}] (Source: {source})\n{doc.page_content[:500]}")
+    for i, r in enumerate(results, 1):
+        evidence_lines.append(f"[{i}] (Source: {r['source_file']})\n{r['text'][:500]}")
 
     evidence = "\n\n".join(evidence_lines)
     return (
