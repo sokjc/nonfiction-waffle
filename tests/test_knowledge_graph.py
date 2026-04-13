@@ -102,3 +102,21 @@ def test_num_entities():
         kg.add_triple("Y", "connects to", "Z")
         # X, Y, Z = 3 unique entities
         assert kg.num_entities >= 3
+
+
+def test_add_triple_skips_none_values():
+    """add_triple should silently skip triples with None or empty values."""
+    with tempfile.TemporaryDirectory() as tmp:
+        settings = _make_settings(tmp)
+        kg = KnowledgeGraphStore(settings)
+
+        kg.add_triple(None, "relates to", "B")
+        kg.add_triple("A", None, "B")
+        kg.add_triple("A", "relates to", None)
+        kg.add_triple("", "relates to", "B")
+        kg.add_triple("A", "relates to", "")
+        assert kg.num_triples == 0
+
+        # Valid triple still works
+        kg.add_triple("A", "relates to", "B")
+        assert kg.num_triples == 1

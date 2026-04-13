@@ -72,11 +72,13 @@ def extract_triples(text: str, llm: ChatOpenAI) -> list[tuple[str, str, str]]:
 
         data = json.loads(cleaned)
         if isinstance(data, list):
+            keys = ("subject", "predicate", "object")
             return [
-                (t["subject"], t["predicate"], t["object"])
+                (t["subject"].strip(), t["predicate"].strip(), t["object"].strip())
                 for t in data
                 if isinstance(t, dict)
-                and all(k in t for k in ("subject", "predicate", "object"))
+                and all(k in t for k in keys)
+                and all(isinstance(t[k], str) and t[k].strip() for k in keys)
             ]
     except Exception as e:
         logger.debug("Triple extraction failed: %s", e)

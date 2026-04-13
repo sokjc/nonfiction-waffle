@@ -106,3 +106,74 @@ def test_extract_triples_invalid_json_returns_empty(monkeypatch):
     kg_extractor.extraction_prompt = original_prompt
 
     assert result == []
+
+
+def test_extract_triples_filters_none_values(monkeypatch):
+    """Should skip triples where subject, predicate, or object is null."""
+    triples_data = [
+        {"subject": "Acme Corp", "predicate": "competes with", "object": "WidgetCo"},
+        {"subject": None, "predicate": "acquired", "object": "StartupX"},
+        {"subject": "TechCo", "predicate": None, "object": "DataInc"},
+        {"subject": "TechCo", "predicate": "partners with", "object": None},
+    ]
+    raw_output = json.dumps(triples_data)
+
+    from strategy_agent.ingestion import kg_extractor
+
+    original_prompt = kg_extractor.extraction_prompt
+
+    class FakeChain:
+        def invoke(self, inputs):
+            return raw_output
+
+    monkeypatch.setattr(
+        kg_extractor,
+        "extraction_prompt",
+        type(
+            "FakePrompt", (),
+            {"__or__": lambda self, other: type(
+                "Mid", (), {"__or__": lambda s, o: FakeChain()}
+            )()},
+        )(),
+    )
+
+    result = extract_triples("Text with null triples.", None)
+    kg_extractor.extraction_prompt = original_prompt
+
+    assert len(result) == 1
+    assert result[0] == ("Acme Corp", "competes with", "WidgetCo")
+
+
+def test_extract_triples_filters_empty_strings(monkeypatch):
+    """Should skip triples where any value is an empty string."""
+    triples_data = [
+        {"subject": "Acme Corp", "predicate": "competes with", "object": "WidgetCo"},
+        {"subject": "", "predicate": "acquired", "object": "StartupX"},
+        {"subject": "TechCo", "predicate": "partners with", "object": "  "},
+    ]
+    raw_output = json.dumps(triples_data)
+
+    from strategy_agent.ingestion import kg_extractor
+
+    original_prompt = kg_extractor.extraction_prompt
+
+    class FakeChain:
+        def invoke(self, inputs):
+            return raw_output
+
+    monkeypatch.setattr(
+        kg_extractor,
+        "extraction_prompt",
+        type(
+            "FakePrompt", (),
+            {"__or__": lambda self, other: type(
+                "Mid", (), {"__or__": lambda s, o: FakeChain()}
+            )()},
+        )(),
+    )
+
+    result = extract_triples("Text with empty triples.", None)
+    kg_extractor.extraction_prompt = original_prompt
+
+    assert len(result) == 1
+    assert result[0] == ("Acme Corp", "competes with", "WidgetCo")
