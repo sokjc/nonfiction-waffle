@@ -20,8 +20,6 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
 ]
 
-[project.urls]
-Repository = "https://github.com/sokjc/nonfiction-waffle"
 dependencies = [
     # --- LangChain core ---
     "langchain>=0.3,<0.4",
@@ -58,6 +56,9 @@ dependencies = [
     # --- Utilities ---
     "tenacity>=9.0",
 ]
+
+[project.urls]
+Repository = "https://github.com/sokjc/nonfiction-waffle"
 
 [project.optional-dependencies]
 dev = [
