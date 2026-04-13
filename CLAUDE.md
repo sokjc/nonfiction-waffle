@@ -16,6 +16,7 @@ Repository: `sokjc/nonfiction-waffle`
 - **CLI:** Typer 0.15+ with Rich formatting
 - **Config:** Pydantic 2.9+ / pydantic-settings 2.6+ (env vars + `.env`)
 - **Session persistence:** SQLite via langgraph-checkpoint-sqlite
+- **Package manager:** [uv](https://docs.astral.sh/uv/)
 - **Build system:** Hatchling (pyproject.toml)
 - **Linting:** Ruff 0.8+
 - **Testing:** Pytest 8.3+ with pytest-asyncio
@@ -23,30 +24,38 @@ Repository: `sokjc/nonfiction-waffle`
 ## Quick Reference Commands
 
 ```bash
-# Install (development)
-pip install -e ".[dev]"
+# Install (development) — uv is the primary package manager
+uv sync --dev
+
+# Alternative: pip install -e ".[dev]"
 
 # Run tests
-pytest tests/ -v
+uv run pytest tests/ -v
 
 # Run tests with coverage
-pytest tests/ --cov
+uv run pytest tests/ --cov
 
 # Lint
-ruff check strategy_agent/ tests/
+uv run ruff check strategy_agent/ tests/
 
 # Lint with auto-fix
-ruff check --fix strategy_agent/ tests/
+uv run ruff check --fix strategy_agent/ tests/
 
-# CLI commands
-strategy-agent ingest ./corpus              # Ingest documents
-strategy-agent ingest ./corpus --build-kg   # Ingest + build knowledge graph
-strategy-agent generate -b "brief text"     # Generate a strategy document
-strategy-agent chat                         # Interactive chat mode
-strategy-agent chat --list                  # List chat sessions
-strategy-agent corpus-info                  # Show corpus statistics
-strategy-agent kg-info                      # Show knowledge graph stats
-strategy-agent style-check <file>           # Lint a document for style
+# Add a dependency
+uv add <package>
+
+# Add a dev dependency
+uv add --dev <package>
+
+# CLI commands (via uv run)
+uv run strategy-agent ingest ./corpus              # Ingest documents
+uv run strategy-agent ingest ./corpus --build-kg   # Ingest + build knowledge graph
+uv run strategy-agent generate -b "brief text"     # Generate a strategy document
+uv run strategy-agent chat                         # Interactive chat mode
+uv run strategy-agent chat --list                  # List chat sessions
+uv run strategy-agent corpus-info                  # Show corpus statistics
+uv run strategy-agent kg-info                      # Show knowledge graph stats
+uv run strategy-agent style-check <file>           # Lint a document for style
 ```
 
 ## Project Structure
@@ -170,7 +179,7 @@ Research → Write → Evaluate → [score < 8?] → Rewrite → Evaluate → ..
 - **Framework:** Pytest with pytest-asyncio (asyncio_mode = "auto")
 - **Location:** `tests/` directory
 - **14 test modules** covering config, ingestion, memory, agents, orchestration, errors, and integration
-- All tests are runnable with `pytest tests/ -v`
+- All tests are runnable with `uv run pytest tests/ -v`
 - Tests mock LLM calls — no external services required to run the test suite
 
 ### Test Naming Pattern
@@ -208,8 +217,9 @@ See `strategy_agent/config.py` for the full `Settings` class with all defaults.
 
 ## Guidelines for AI Assistants
 
-- Run `ruff check strategy_agent/ tests/` before committing to catch lint issues
-- Run `pytest tests/ -v` to verify changes don't break existing tests
+- Run `uv run ruff check strategy_agent/ tests/` before committing to catch lint issues
+- Run `uv run pytest tests/ -v` to verify changes don't break existing tests
+- Use `uv add <package>` / `uv add --dev <package>` to manage dependencies (not `pip install`)
 - When adding new modules, follow the existing package structure (agents/, memory/, tools/, etc.)
 - When adding new agents, follow the pattern in existing agents: constructor takes `llm` + `settings`, exposes a `run(memory)` method
 - New tools should use the `@tool` decorator and go in `strategy_agent/tools/`
