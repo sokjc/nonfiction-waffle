@@ -1,15 +1,17 @@
 """Centralized configuration driven by environment variables / .env file.
 
-The framework uses three distinct model roles:
+All LLMs and the embedding model share a single OpenAI-compatible endpoint
+(``LLM_BASE_URL`` + ``LLM_API_KEY``).  The framework distinguishes three
+model roles by ``*_MODEL`` name only:
 
-- **Writer** (``WRITER_*``): Primary content generation — drafts and rewrites.
-  Optimized for fluency and style adherence.  Default: ``gpt-oss``.
-- **Agent** (``AGENT_*``): Orchestration, research, tool-calling, chat.
+- **Writer** (``WRITER_MODEL``): Primary content generation — drafts and
+  rewrites.  Optimized for fluency and style adherence.  Default: ``gpt-oss``.
+- **Agent** (``AGENT_MODEL``): Orchestration, research, tool-calling, chat.
   Needs strong instruction-following and tool use.  Default: ``gemma4-31b``.
-- **Evaluator** (``EVAL_*``): Narrative scoring and quality assessment.
+- **Evaluator** (``EVAL_MODEL``): Narrative scoring and quality assessment.
   Benefits from a heavier model for better judgment.  Default: ``nemotron-120b``.
 
-All three connect via OpenAI-compatible endpoints and can be swapped freely.
+Per-role temperature and max-token caps are also configurable independently.
 """
 
 from __future__ import annotations
@@ -34,33 +36,32 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    # ── Shared LLM endpoint (auth used by all roles + embeddings) ────────
+    llm_base_url: str = Field("http://localhost:8000/v1", alias="LLM_BASE_URL")
+    llm_api_key: str = Field("not-needed", alias="LLM_API_KEY")
+
     # ── Writer LLM (drafts, rewrites — optimized for prose quality) ──────
-    writer_base_url: str = Field("http://localhost:8000/v1", alias="WRITER_BASE_URL")
-    writer_api_key: str = Field("not-needed", alias="WRITER_API_KEY")
     writer_model: str = Field("gpt-oss", alias="WRITER_MODEL")
-    writer_temperature: float = 0.7
-    writer_max_tokens: int = 4096
+    writer_temperature: float = Field(0.7, alias="WRITER_TEMPERATURE")
+    writer_max_tokens: int = Field(4096, alias="WRITER_MAX_TOKENS")
 
     # ── Agent LLM (research, chat, tool-calling — needs tool use) ────────
-    agent_base_url: str = Field("http://localhost:8000/v1", alias="AGENT_BASE_URL")
-    agent_api_key: str = Field("not-needed", alias="AGENT_API_KEY")
     agent_model: str = Field("gemma4-31b", alias="AGENT_MODEL")
-    agent_temperature: float = 0.4
-    agent_max_tokens: int = 4096
+    agent_temperature: float = Field(0.4, alias="AGENT_TEMPERATURE")
+    agent_max_tokens: int = Field(4096, alias="AGENT_MAX_TOKENS")
 
     # ── Evaluator LLM (scoring — heavier model for better judgment) ──────
-    eval_base_url: str = Field("http://localhost:8000/v1", alias="EVAL_BASE_URL")
-    eval_api_key: str = Field("not-needed", alias="EVAL_API_KEY")
     eval_model: str = Field("nemotron-120b", alias="EVAL_MODEL")
-    eval_temperature: float = 0.3
-    eval_max_tokens: int = 4096
+    eval_temperature: float = Field(0.3, alias="EVAL_TEMPERATURE")
+    eval_max_tokens: int = Field(4096, alias="EVAL_MAX_TOKENS")
 
-    # ── Embeddings (LlamaIndex + Nomic) ───────────────────────────────────
+    # ── Embeddings (share the LLM endpoint by default) ───────────────────
+    # Set ``EMBEDDING_LOCAL=true`` to use HuggingFace sentence-transformers
+    # locally instead of the remote endpoint (requires the ``local`` extra).
     embedding_model: str = Field(
         "nomic-ai/nomic-embed-text-v1.5", alias="EMBEDDING_MODEL"
     )
-    embedding_base_url: str | None = Field(None, alias="EMBEDDING_BASE_URL")
-    embedding_api_key: str | None = Field(None, alias="EMBEDDING_API_KEY")
+    embedding_local: bool = Field(False, alias="EMBEDDING_LOCAL")
 
     # ── LlamaIndex vector store ───────────────────────────────────────────
     index_persist_dir: Path = Field(

@@ -49,12 +49,12 @@ class WriterAgent:
                 "research_synthesis": memory.research_synthesis,
                 "additional_instructions": memory.additional_instructions,
             },
-            endpoint_url=self._settings.writer_base_url,
+            endpoint_url=self._settings.llm_base_url,
         )
 
         memory.drafts.append(draft)
         memory.current_iteration += 1
-        memory.model_used = self._settings.llm_model
+        memory.model_used = self._settings.writer_model
 
         logger.info(
             "Draft %d complete (%d chars)",

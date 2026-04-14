@@ -65,19 +65,21 @@ uv run strategy-agent chat
 
 ### Three-Model Architecture
 
-The framework uses three distinct model roles, each connectable to any OpenAI-compatible endpoint:
+The framework uses three distinct model roles. All share a single OpenAI-compatible
+endpoint (`LLM_BASE_URL` + `LLM_API_KEY`); roles are distinguished by model name:
 
-| Role | Default Model | Purpose | Config Prefix |
+| Role | Default Model | Purpose | Model Env Var |
 |------|--------------|---------|---------------|
-| **Writer** | `gpt-oss` | Prose generation and rewriting | `WRITER_*` |
-| **Agent** | `gemma4-31b` | Research, chat, tool-calling | `AGENT_*` |
-| **Evaluator** | `nemotron-120b` | Narrative scoring and quality assessment | `EVAL_*` |
+| **Writer** | `gpt-oss` | Prose generation and rewriting | `WRITER_MODEL` |
+| **Agent** | `gemma4-31b` | Research, chat, tool-calling | `AGENT_MODEL` |
+| **Evaluator** | `nemotron-120b` | Narrative scoring and quality assessment | `EVAL_MODEL` |
 
 This avoids the "grading your own homework" problem — the evaluator is a *different model* than the writer, producing more honest quality assessments.
 
 ### Model Server Setup
 
-All three roles connect via OpenAI-compatible endpoints. Common setups:
+All roles (and embeddings) connect via a single OpenAI-compatible endpoint.
+Common setups:
 
 | Server | Command | Base URL |
 |--------|---------|----------|
@@ -85,7 +87,8 @@ All three roles connect via OpenAI-compatible endpoints. Common setups:
 | **vLLM** | `vllm serve gemma4-31b` | `http://localhost:8000/v1` |
 | **LM Studio** | Start from GUI | `http://localhost:1234/v1` |
 
-All three models can run on the same server (same URL, different model names) or on separate GPU servers (different URLs).
+Point `LLM_BASE_URL` at your server and set the three `*_MODEL` variables to the
+names your server recognizes.
 
 ## CLI Reference
 
@@ -164,9 +167,13 @@ All settings are controlled via environment variables or a `.env` file. See [`.e
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `LLM_BASE_URL` | `http://localhost:8000/v1` | Shared endpoint for all LLMs + embeddings |
+| `LLM_API_KEY` | `not-needed` | Shared API key for the endpoint |
 | `WRITER_MODEL` | `gpt-oss` | Model for prose generation |
 | `AGENT_MODEL` | `gemma4-31b` | Model for research and chat |
 | `EVAL_MODEL` | `nemotron-120b` | Model for quality evaluation |
+| `EMBEDDING_MODEL` | `nomic-ai/nomic-embed-text-v1.5` | Model for embeddings |
+| `EMBEDDING_LOCAL` | `false` | Use local sentence-transformers instead of the shared endpoint |
 | `MAX_REWRITE_LOOPS` | `3` | Max revision passes |
 | `CHUNK_SIZE` | `1500` | Document chunk size (characters) |
 

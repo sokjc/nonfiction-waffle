@@ -63,7 +63,7 @@ class RewriterAgent:
                 "weaknesses": "\n".join(f"- {w}" for w in evaluation.weaknesses),
                 "rewrite_instructions": evaluation.rewrite_instructions,
             },
-            endpoint_url=self._settings.writer_base_url,
+            endpoint_url=self._settings.llm_base_url,
         )
 
         memory.drafts.append(revised)
