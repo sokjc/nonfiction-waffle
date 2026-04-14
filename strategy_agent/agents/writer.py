@@ -49,7 +49,7 @@ class WriterAgent:
                 "research_synthesis": memory.research_synthesis,
                 "additional_instructions": memory.additional_instructions,
             },
-            endpoint_url=self._settings.writer_base_url,
+            endpoint_url=self._settings.llm_base_url,
         )
 
         memory.drafts.append(draft)

@@ -109,15 +109,17 @@ output/                       # Generated documents
 
 ### Three-Model System
 
-The framework uses three distinct LLM roles, each configurable to a different model/endpoint:
+The framework uses three distinct LLM roles. All share a single OpenAI-compatible
+endpoint (`LLM_BASE_URL` + `LLM_API_KEY`); roles are distinguished by model name:
 
-| Role | Env Prefix | Default Model | Purpose |
-|------|-----------|---------------|---------|
-| **Writer** | `WRITER_*` | gpt-oss | Prose generation, rewrites (temp=0.7) |
-| **Agent** | `AGENT_*` | gemma4-31b | Research, chat, tool-calling (temp=0.4) |
-| **Evaluator** | `EVAL_*` | nemotron-120b | Quality scoring (temp=0.3) |
+| Role | Model Env Var | Default Model | Purpose |
+|------|--------------|---------------|---------|
+| **Writer** | `WRITER_MODEL` | gpt-oss | Prose generation, rewrites (temp=0.7) |
+| **Agent** | `AGENT_MODEL` | gemma4-31b | Research, chat, tool-calling (temp=0.4) |
+| **Evaluator** | `EVAL_MODEL` | nemotron-120b | Quality scoring (temp=0.3) |
 
-Using a different evaluator model avoids the "grading your own homework" problem. All connect via OpenAI-compatible endpoints.
+Per-role `*_TEMPERATURE` and `*_MAX_TOKENS` are also configurable. Using a
+different evaluator model avoids the "grading your own homework" problem.
 
 ### Multi-Agent Pipeline (LangGraph)
 
@@ -196,10 +198,11 @@ cp .env.example .env
 ```
 
 Key environment variables:
-- `WRITER_BASE_URL`, `WRITER_API_KEY`, `WRITER_MODEL` — Writer LLM
-- `AGENT_BASE_URL`, `AGENT_API_KEY`, `AGENT_MODEL` — Agent LLM
-- `EVAL_BASE_URL`, `EVAL_API_KEY`, `EVAL_MODEL` — Evaluator LLM
-- `EMBEDDING_MODEL` — HuggingFace embedding model name
+- `LLM_BASE_URL`, `LLM_API_KEY` — Shared endpoint + auth for all LLMs and embeddings
+- `WRITER_MODEL` (+ optional `WRITER_TEMPERATURE`, `WRITER_MAX_TOKENS`) — Writer LLM
+- `AGENT_MODEL` (+ optional `AGENT_TEMPERATURE`, `AGENT_MAX_TOKENS`) — Agent LLM
+- `EVAL_MODEL` (+ optional `EVAL_TEMPERATURE`, `EVAL_MAX_TOKENS`) — Evaluator LLM
+- `EMBEDDING_MODEL` — Embedding model name; set `EMBEDDING_LOCAL=true` for local inference
 - `INDEX_PERSIST_DIR`, `CORPUS_DIR`, `OUTPUT_DIR` — File paths
 - `MAX_REWRITE_LOOPS`, `CHUNK_SIZE`, `CHUNK_OVERLAP` — Tuning parameters
 

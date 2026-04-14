@@ -63,7 +63,7 @@ Repository = "https://github.com/sokjc/nonfiction-waffle"
 [project.optional-dependencies]
 local = [
     # Local embeddings via sentence-transformers (pulls in PyTorch).
-    # Not needed when using an API-based embedding endpoint (EMBEDDING_BASE_URL).
+    # Not needed when embeddings use the shared LLM_BASE_URL endpoint.
     "llama-index-embeddings-huggingface>=0.7",
     "sentence-transformers>=3.0",
 ]
