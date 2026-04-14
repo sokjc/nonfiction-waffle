@@ -54,7 +54,7 @@ class WriterAgent:
 
         memory.drafts.append(draft)
         memory.current_iteration += 1
-        memory.model_used = self._settings.llm_model
+        memory.model_used = self._settings.writer_model
 
         logger.info(
             "Draft %d complete (%d chars)",
